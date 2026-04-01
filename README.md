@@ -1,4 +1,4 @@
-# Titan
+# TitanAI
 
 A local multi-agent coding assistant built with LangGraph, RAG, and local LLMs running on 4x Titan XP GPUs. Works as both a coding assistant and a general-purpose AI.
 
@@ -50,4 +50,3 @@ Project Status
 Currently in Phase 1 — single agent with tool use (read/write files, run commands).
 
 See the full project guide for the roadmap through all 5 phases.
-
