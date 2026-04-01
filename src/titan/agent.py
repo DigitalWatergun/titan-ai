@@ -17,7 +17,7 @@ class AgentState(TypedDict):
 tools = [read_file, write_file, list_directory, run_command]
 
 llm = ChatOllama(
-    model="qwen2.5-coder:7b", base_url="http://localhost:11434", temperature=0
+    model="qwen2.5:7b", base_url="http://localhost:11434", temperature=0
 ).bind_tools(tools)
 
 SYSTEM_PROMPT = """You are a coding assistant with access to the local filesystem. You can read files, write files, list directories, and run shell commands. When the user asks about code, use your tools to explore the codebase first. Be concise and direct in your responses."""
