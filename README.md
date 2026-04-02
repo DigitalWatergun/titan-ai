@@ -33,20 +33,28 @@ cd titan-ai
 # Install dependencies
 uv sync
 
-# Activate the virtual environment
-source .venv/bin/activate
+# Install globally (works from any directory, auto-updates with code changes)
+uv tool install --editable .
 
 # Pull the model (Phase 1)
-ollama pull qwen2.5-coder:7b
-
-# Run
-titan
+ollama pull qwen2.5:7b
 ```
 
-# Run
+## Usage
 
-Project Status
+```bash
+# General questions
+titan chat
 
-Currently in Phase 1 — single agent with tool use (read/write files, run commands).
+# Work on a codebase with indexing
+titan chat --index
+
+# Index a codebase explicitly
+titan index ~/projects/some-project
+```
+
+## Project Status
+
+Currently in **Phase 2** — RAG & Vector Database (ChromaDB, nomic-embed-text).
 
 See the full project guide for the roadmap through all 5 phases.
