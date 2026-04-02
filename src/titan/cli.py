@@ -45,10 +45,25 @@ def chat(
 
     while True:
         user_input = console.input("[bold blue]You:[/] ")
-        if user_input.lower() in ("quit", "exit", "q'"):
+        if user_input.lower() in ("quit", "exit", "q"):
             break
 
         messages.append(HumanMessage(content=user_input))
+
+        # Stream events to show tool usage in real time
+        for event in agent.stream({"messages": messages}):
+            for key, value in event.items():
+                if key == "agent":
+                    last_msg = value["messages"][-1]
+                    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+                        for tc in last_msg.tool_calls:
+                            console.print(f"  [dim]→ {tc['name']}({tc['args']})[/dim]")
+                elif key == "tools":
+                    for msg in value["messages"]:
+                        if hasattr(msg, "name"):
+                            console.print(f"  [dim]✓ {msg.name} completed[/dim]")
+
+        # Get final state with all messages
         result = agent.invoke({"messages": messages})
         messages = result["messages"]
 
