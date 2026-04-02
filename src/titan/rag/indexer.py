@@ -24,7 +24,7 @@ def index_codebase(directory_path: str, collection_name: str = "codebase") -> in
     # Delete existing collection if re-indexing
     try:
         client.delete_collection(collection_name)
-    except ValueError:
+    except Exception:
         pass
 
     collection = client.create_collection(
