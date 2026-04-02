@@ -13,6 +13,8 @@ BLOCKED_COMMANDS = [
     "dd if=",
     ":(){:|:&};:",
     "chmod -R 777 /",
+    "grep -r",
+    "find /",
 ]
 
 

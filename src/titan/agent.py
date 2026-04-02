@@ -20,12 +20,30 @@ llm = ChatOllama(
     model="qwen2.5:7b", base_url="http://localhost:11434", temperature=0
 ).bind_tools(tools)
 
-SYSTEM_PROMPT = """You are a coding assistant with access to the local filesystem. You can read files, write files, list directories, and run shell commands. When the user asks about code, use your tools to explore the codebase first. Be concise and direct in your responses."""
+SYSTEM_PROMPT = """You are a coding assistant with access to the local filesystem.
+  You have these tools available — ALWAYS use them instead of writing code snippets:
+  - read_file: Read file contents
+  - write_file: Write content to a file
+  - list_directory: List files in a directory
+  - run_command: Run shell commands
+
+  Never write Python code to read files or list directories. Use your tools.
+  When the user asks about code, use list_directory and read_file to explore.
+  Be concise and direct in your responses."""
 
 
 def call_model(state: AgentState) -> dict:
     """The LLM node - decides whether to use a tool or respond."""
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+
+    # Reinforce tool usage if the last message was a tool result
+    if len(state["messages"]) > 1 and state["messages"][-1].type == "tool":
+        messages.append(
+            SystemMessage(
+                content="Use your tools for any further file or command operations. Do not write code snippets."
+            )
+        )
+
     response = llm.invoke(messages)
     return {"messages": [response]}
 
