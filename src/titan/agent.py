@@ -7,6 +7,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from titan.tools.filesystem import list_directory, read_file, write_file
+from titan.tools.rag import search_codebase
 from titan.tools.shell import run_command
 
 
@@ -14,7 +15,7 @@ class AgentState(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
 
 
-tools = [read_file, write_file, list_directory, run_command]
+tools = [read_file, write_file, list_directory, run_command, search_codebase]
 
 llm = ChatOllama(
     model="qwen2.5:7b", base_url="http://localhost:11434", temperature=0
@@ -26,9 +27,9 @@ SYSTEM_PROMPT = """You are a coding assistant with access to the local filesyste
   - write_file: Write content to a file
   - list_directory: List files in a directory
   - run_command: Run shell commands
+  - search_codebase: Search the indexed codebase by meaning
 
   Never write Python code to read files or list directories. Use your tools.
-  When the user asks about code, use list_directory and read_file to explore.
   Be concise and direct in your responses."""
 
 
