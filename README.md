@@ -10,8 +10,8 @@ Titan uses specialized AI agents that each run on their own GPU:
 | ----------- | ------------------------------------------------------- | ---------------- |
 | **Bridget** | Router — directs requests to the right specialist       | qwen2.5:3b       |
 | **Cody**    | Code — writes, edits, and debugs code                   | qwen2.5-coder:7b |
-| **Paige**   | Research — answers questions, searches web and codebase | mistral:7b       |
-| **Mark**    | Review — reviews code and suggests improvements         | llama3:8b        |
+| **Paige**   | Research — answers questions, searches web and codebase | qwen2.5:7b       |
+| **Mark**    | Review — reviews code and suggests improvements         | llama3.1:8b      |
 
 For complex tasks, the router chains multiple agents in sequence (e.g., research → code → review).
 
