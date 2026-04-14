@@ -1,17 +1,29 @@
+import os
+import sys
 from pathlib import Path
 from typing import cast
 
 import chromadb
 from chromadb.api.types import Embedding
-from langchain_ollama import OllamaEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from rich.progress import track
 
 from titan.rag.chunker import chunk_file, collect_files
 
 
 def create_embeddings():
-    """Create the embedding function using Ollama."""
-    return OllamaEmbeddings(model="nomic-embed-text", base_url="http://localhost:11434")
+    """Create the embedding function."""
+    # Suppress noisy stderr output from model loading
+    stderr = sys.stderr
+    sys.stderr = open(os.devnull, "w")
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name="nomic-ai/nomic-embed-text-v1",
+            model_kwargs={"trust_remote_code": True, "device": "cpu"},
+        )
+    finally:
+        sys.stderr = stderr
+    return embeddings
 
 
 def index_codebase(directory_path: str, collection_name: str = "codebase") -> int:

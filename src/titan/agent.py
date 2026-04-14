@@ -1,10 +1,11 @@
 from typing import Annotated, List, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
+from pydantic import SecretStr
 
 from titan.tools.filesystem import list_directory, read_file, write_file
 from titan.tools.rag import search_codebase
@@ -25,8 +26,11 @@ tools = [
     web_search,
 ]
 
-llm = ChatOllama(
-    model="qwen2.5:7b", base_url="http://localhost:11434", temperature=0
+llm = ChatOpenAI(
+    base_url="http://localhost:8002/v1",  # llama.cpp server port
+    api_key=SecretStr("na"),  # llama.cpp doesn't need API key
+    model="code",  # matches --alias flag
+    temperature=0,
 ).bind_tools(tools)
 
 SYSTEM_PROMPT = """You are a coding assistant with access to the local filesystem.

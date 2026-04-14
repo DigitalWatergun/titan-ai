@@ -5,7 +5,7 @@ from titan.rag.indexer import create_embeddings
 
 
 @tool
-def search_codebase(query: str, n_results: int = 5) -> str:
+def search_codebase(query: str) -> str:
     """Search the indexed codebase for code relevant to the query.
     Use this to find where things are implemented, understand patterns, etc."""
     try:
@@ -13,6 +13,8 @@ def search_codebase(query: str, n_results: int = 5) -> str:
         collection = client.get_collection("codebase")
     except Exception:
         return "Error: Codebase not indexed yet. Run 'titan index' first."
+
+    n_results = 5
 
     embeddings = create_embeddings()
     query_vector = embeddings.embed_query(query)

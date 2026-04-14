@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import typer
@@ -6,8 +7,12 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from titan.agent import build_agent
+from titan.graph import build_multi_agent
 from titan.rag.indexer import index_codebase
+
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
 
 app = typer.Typer()
 console = Console()
@@ -40,7 +45,7 @@ def chat(
         )
     )
 
-    agent = build_agent()
+    agent = build_multi_agent()
     messages = []
 
     while True:
@@ -51,21 +56,58 @@ def chat(
         messages.append(HumanMessage(content=user_input))
 
         # Stream events to show tool usage in real time
-        for event in agent.stream({"messages": messages}):
+        last_event = None
+        for event in agent.stream(
+            {
+                "messages": messages + [HumanMessage(content=user_input)],
+                "route": "",
+                "research_output": "",
+                "code_output": "",
+                "review_output": "",
+                "iteration": 0,
+            }
+        ):
+            last_event = event
             for key, value in event.items():
-                if key == "agent":
+                if key == "router":
+                    route = value.get("route", "")
+                    iteration = value.get("iteration", 0)
+                    if route == "done":
+                        console.print(
+                            f"  [dim]✅ Router → done (after {iteration} steps)[/dim]"
+                        )
+                    elif route:
+                        agent_names = {
+                            "code": "Cody",
+                            "research": "Paige",
+                            "review": "Mark",
+                        }
+                        name = agent_names.get(route, route)
+                        console.print(f"  [dim]🔀 Router → {name}[/dim]")
+                elif key in ("code_agent", "research_agent", "review_agent"):
+                    agent_names = {
+                        "code_agent": "Cody",
+                        "research_agent": "Paige",
+                        "review_agent": "Mark",
+                    }
+                    name = agent_names.get(key, key)
                     last_msg = value["messages"][-1]
                     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
                         for tc in last_msg.tool_calls:
-                            console.print(f"  [dim]→ {tc['name']}({tc['args']})[/dim]")
-                elif key == "tools":
-                    for msg in value["messages"]:
-                        if hasattr(msg, "name"):
-                            console.print(f"  [dim]✓ {msg.name} completed[/dim]")
+                            console.print(
+                                f"  [dim]  {name} → {tc['name']}({tc['args']})[/dim]"
+                            )
+                    elif hasattr(last_msg, "content") and last_msg.content:
+                        # Show first 80 chars of the agent's response
+                        preview = last_msg.content[:80].replace("\n", " ")
+                        console.print(f"  [dim]  {name}: {preview}...[/dim]")
 
         # Get final state with all messages
-        result = agent.invoke({"messages": messages})
-        messages = result["messages"]
+        if last_event:
+            for value in last_event.values():
+                if "messages" in value:
+                    messages = value["messages"]
+                    break
 
         # Display the final response
         ai_message = messages[-1]

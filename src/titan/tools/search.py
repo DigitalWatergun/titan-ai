@@ -16,7 +16,7 @@ class WebSearchInput(BaseModel):
 
 
 @tool(args_schema=WebSearchInput)
-def web_search(query: str, num_results: int = 5) -> str:
+def web_search(query: str, num_results: int = 3) -> str:
     """Search the web for current information using SearXNG.
     Use this when you need up-to-date information, documentation, or anything
     not found in the local codebase."""
