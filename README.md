@@ -1,48 +1,34 @@
-# TitanAI
+# Titan
 
 A local multi-agent coding assistant built with LangGraph, RAG, and local LLMs running on 4x Titan XP GPUs. Works as both a coding assistant and a general-purpose AI.
 
-## Overview
+## Agents
 
-Titan uses specialized AI agents that each run on their own GPU:
+| Agent       | GPU               | Role                                                    | Model            |
+| ----------- | ----------------- | ------------------------------------------------------- | ---------------- |
+| **Bridget** | GPU 0 (port 8001) | Router — classifies requests and chains agents          | qwen2.5:7b       |
+| **Cody**    | GPU 1 (port 8002) | Code — writes, edits, and debugs code                   | qwen2.5-coder:7b |
+| **Paige**   | GPU 2 (port 8003) | Research — answers questions, searches web and codebase | qwen2.5:7b       |
+| **Mark**    | GPU 3 (port 8004) | Review — reviews code and suggests improvements         | llama3.1:8b      |
 
-| Agent       | Role                                                    | Model            |
-| ----------- | ------------------------------------------------------- | ---------------- |
-| **Bridget** | Router — directs requests to the right specialist       | qwen2.5:3b       |
-| **Cody**    | Code — writes, edits, and debugs code                   | qwen2.5-coder:7b |
-| **Paige**   | Research — answers questions, searches web and codebase | qwen2.5:7b       |
-| **Mark**    | Review — reviews code and suggests improvements         | llama3.1:8b      |
-
-For complex tasks, the router chains multiple agents in sequence (e.g., research → code → review).
-
-## Requirements
-
-- 4x NVIDIA Titan XP (12GB each)
-- 128GB RAM
-- Ubuntu 24.04
-- NVIDIA Driver 535+
-- CUDA 12.2+
+For complex tasks, the router chains multiple agents in sequence (e.g., research -> code -> review).
 
 ## Setup
 
 ```bash
-# Clone the repo
-git clone git@github.com:youruser/titan-ai.git
+git clone git@github.com:digitalwatergun/titan-ai.git
 cd titan-ai
 
-# Install dependencies
 uv sync
-
-# Install globally (works from any directory, auto-updates with code changes)
 uv tool install --editable .
-
-# Pull the model (Phase 1)
-ollama pull qwen2.5:7b
 ```
 
 ## Usage
 
 ```bash
+# Start the llama.cpp servers (run in a tmux pane)
+./launch_models.sh
+
 # General questions
 titan chat
 
@@ -50,11 +36,11 @@ titan chat
 titan chat --index
 
 # Index a codebase explicitly
-titan index ~/projects/some-project
+titan index
 ```
 
 ## Project Status
 
-Currently in **Phase 2** — RAG & Vector Database (ChromaDB, nomic-embed-text).
+Currently in **Phase 3** — Multi-agent system with LangGraph and llama.cpp.
 
 See the full project guide for the roadmap through all 5 phases.
