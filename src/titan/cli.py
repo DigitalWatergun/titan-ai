@@ -8,11 +8,20 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from titan.graph import build_multi_agent
+from titan.graph.state import AgentState
 from titan.rag.indexer import index_codebase
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+)
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 app = typer.Typer()
 console = Console()
@@ -56,19 +65,22 @@ def chat(
         messages.append(HumanMessage(content=user_input))
 
         # Stream events to show tool usage in real time
-        last_event = None
-        for event in agent.stream(
-            {
-                "messages": messages + [HumanMessage(content=user_input)],
-                "route": "",
-                "research_output": "",
-                "code_output": "",
-                "review_output": "",
-                "iteration": 0,
-            }
-        ):
-            last_event = event
+        final_messages = None
+        input_state: AgentState = {
+            "messages": messages + [HumanMessage(content=user_input)],
+            "route": "",
+            "research_output": "",
+            "code_output": "",
+            "review_output": "",
+            "iteration": 0,
+            "working_directory": "",
+            "context": "",
+        }
+        for event in agent.stream(input_state):
             for key, value in event.items():
+                if "messages" in value:
+                    final_messages = value["messages"]
+
                 if key == "router":
                     route = value.get("route", "")
                     iteration = value.get("iteration", 0)
@@ -91,23 +103,21 @@ def chat(
                         "review_agent": "Mark",
                     }
                     name = agent_names.get(key, key)
-                    last_msg = value["messages"][-1]
-                    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
-                        for tc in last_msg.tool_calls:
-                            console.print(
-                                f"  [dim]  {name} → {tc['name']}({tc['args']})[/dim]"
-                            )
-                    elif hasattr(last_msg, "content") and last_msg.content:
-                        # Show first 80 chars of the agent's response
-                        preview = last_msg.content[:80].replace("\n", " ")
-                        console.print(f"  [dim]  {name}: {preview}...[/dim]")
+                    for msg in value["messages"]:
+                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                            for tc in msg.tool_calls:
+                                console.print(
+                                    f"  [dim]  {name} → {tc['name']}({tc['args']})[/dim]"
+                                )
+                        elif msg.type == "tool" and hasattr(msg, "name"):
+                            console.print(f"  [dim]  ✓ {msg.name} completed[/dim]")
+                        elif msg.type == "ai" and msg.content:
+                            preview = msg.content[:80].replace("\n", " ")
+                            console.print(f"  [dim]  {name}: {preview}...[/dim]")
 
         # Get final state with all messages
-        if last_event:
-            for value in last_event.values():
-                if "messages" in value:
-                    messages = value["messages"]
-                    break
+        if final_messages:
+            messages = final_messages
 
         # Display the final response
         ai_message = messages[-1]

@@ -6,9 +6,9 @@ A local multi-agent coding assistant built with LangGraph, RAG, and local LLMs r
 
 | Agent       | GPU               | Role                                                    | Model            |
 | ----------- | ----------------- | ------------------------------------------------------- | ---------------- |
-| **Bridget** | GPU 0 (port 8001) | Router — classifies requests and chains agents          | qwen2.5:7b       |
+| **Bridget** | GPU 0 (port 8001) | Router — classifies requests and chains agents          | qwen3:8b         |
 | **Cody**    | GPU 1 (port 8002) | Code — writes, edits, and debugs code                   | qwen2.5-coder:7b |
-| **Paige**   | GPU 2 (port 8003) | Research — answers questions, searches web and codebase | qwen2.5:7b       |
+| **Paige**   | GPU 2 (port 8003) | Research — answers questions, searches web and codebase | qwen3:8b         |
 | **Mark**    | GPU 3 (port 8004) | Review — reviews code and suggests improvements         | llama3.1:8b      |
 
 For complex tasks, the router chains multiple agents in sequence (e.g., research -> code -> review).

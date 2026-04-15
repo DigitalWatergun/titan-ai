@@ -11,7 +11,8 @@ router_llm = ChatOpenAI(
     temperature=0,
 )
 
-ROUTER_PROMPT = """You are Bridget, a request router. Based on the user's request and what has been completed so far, pick the NEXT step needed, or "done" if the task is complete.
+ROUTER_PROMPT = """/no_think
+You are Bridget, a request router. Based on the user's request and what has been completed so far, pick the NEXT step needed, or "done" if the task is complete.
 Categories:
 - "code" — writing, editing, or creating code files
 - "research" — searching for information, documentation, or understanding concepts

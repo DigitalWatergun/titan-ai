@@ -6,7 +6,7 @@ MODELS=~/models
 
 # GPU 0: Router (qwen2.5-3b) — fast classification
 $LLAMA_CPP \
-  --model $MODELS/qwen2.5-7b-instruct.Q5_K_M.gguf \
+  --model $MODELS/qwen3-8b.Q5_K_M.gguf \
   --n-gpu-layers 999 \
   --split-mode none \
   --main-gpu 0 \
@@ -28,7 +28,7 @@ $LLAMA_CPP \
 
 # GPU 2: Research Agent (qwen2.5-7b)
 $LLAMA_CPP \
-  --model $MODELS/qwen2.5-7b-instruct.Q5_K_M.gguf \
+  --model $MODELS/qwen3-8b.Q5_K_M.gguf \
   --n-gpu-layers 999 \
   --split-mode none \
   --main-gpu 2 \
