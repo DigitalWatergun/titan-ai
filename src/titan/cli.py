@@ -27,6 +27,18 @@ app = typer.Typer()
 console = Console()
 
 
+def _get_agent_name(namespace: tuple) -> str:
+    """Extract agent name from subgraph namespace."""
+    ns_str = str(namespace)
+    if "research_agent" in ns_str:
+        return "Paige"
+    elif "code_agent" in ns_str:
+        return "Cody"
+    elif "review_agent" in ns_str:
+        return "Mark"
+    return "Agent"
+
+
 @app.command()
 def chat(
     working_dir: str = typer.Option(".", help="Working directory for the agent"),
@@ -55,7 +67,7 @@ def chat(
     )
 
     agent = build_multi_agent()
-    messages = []
+    messages: list = []
 
     while True:
         user_input = console.input("[bold blue]You:[/] ")
@@ -64,7 +76,7 @@ def chat(
 
         messages.append(HumanMessage(content=user_input))
 
-        # Stream events to show tool usage in real time
+        # Stream events with subgraphs for real-time tool visibility
         final_messages = None
         input_state: AgentState = {
             "messages": messages + [HumanMessage(content=user_input)],
@@ -76,12 +88,14 @@ def chat(
             "working_directory": "",
             "context": "",
         }
-        for event in agent.stream(input_state):
+        for namespace, event in agent.stream(input_state, subgraphs=True):
             for key, value in event.items():
-                if "messages" in value:
+                # Only capture final messages from outer graph events
+                if namespace == () and "messages" in value:
                     final_messages = value["messages"]
 
-                if key == "router":
+                # Outer graph: router decisions
+                if namespace == () and key == "router":
                     route = value.get("route", "")
                     iteration = value.get("iteration", 0)
                     if route == "done":
@@ -96,26 +110,27 @@ def chat(
                         }
                         name = agent_names.get(route, route)
                         console.print(f"  [dim]🔀 Router → {name}[/dim]")
-                elif key in ("code_agent", "research_agent", "review_agent"):
-                    agent_names = {
-                        "code_agent": "Cody",
-                        "research_agent": "Paige",
-                        "review_agent": "Mark",
-                    }
-                    name = agent_names.get(key, key)
-                    for msg in value["messages"]:
-                        if hasattr(msg, "tool_calls") and msg.tool_calls:
-                            for tc in msg.tool_calls:
-                                console.print(
-                                    f"  [dim]  {name} → {tc['name']}({tc['args']})[/dim]"
-                                )
-                        elif msg.type == "tool" and hasattr(msg, "name"):
-                            console.print(f"  [dim]  ✓ {msg.name} completed[/dim]")
-                        elif msg.type == "ai" and msg.content:
-                            preview = msg.content[:80].replace("\n", " ")
-                            console.print(f"  [dim]  {name}: {preview}...[/dim]")
 
-        # Get final state with all messages
+                # Inner subgraph: model calls (tool requests and responses)
+                elif len(namespace) > 0 and key == "model":
+                    agent_name = _get_agent_name(namespace)
+                    last_msg = value["messages"][-1]
+                    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+                        for tc in last_msg.tool_calls:
+                            console.print(
+                                f"  [dim]    {agent_name} → {tc['name']}({tc['args']})[/dim]"
+                            )
+                    elif last_msg.type == "ai" and last_msg.content:
+                        preview = last_msg.content[:80].replace("\n", " ")
+                        console.print(f"  [dim]    {agent_name}: {preview}...[/dim]")
+
+                # Inner subgraph: tool execution results
+                elif len(namespace) > 0 and key == "tools":
+                    for msg in value["messages"]:
+                        if hasattr(msg, "name"):
+                            console.print(f"  [dim]    ✓ {msg.name} completed[/dim]")
+
+        # Update messages from stream
         if final_messages:
             messages = final_messages
 

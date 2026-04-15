@@ -1,9 +1,9 @@
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langgraph.graph import END, StateGraph
 
 from titan.graph.code_agent import code_agent
 from titan.graph.research_agent import research_agent
-from titan.graph.review_agent import review_agent  # Similar to code_agent
+from titan.graph.review_agent import review_agent
 from titan.graph.router import pick_agent, route_request
 from titan.graph.state import AgentState
 
@@ -12,7 +12,6 @@ def _get_specialist_input(state: AgentState) -> list:
     """Build clean input for a specialist — just context + user question."""
     messages = []
 
-    # Add previous specialist outputs as context
     context_parts = []
     if state.get("research_output"):
         context_parts.append(f"[Paige's research]\n{state['research_output']}")
@@ -27,7 +26,6 @@ def _get_specialist_input(state: AgentState) -> list:
             )
         )
 
-    # Add only the last user message
     for msg in reversed(state["messages"]):
         if msg.type == "human":
             messages.append(msg)
@@ -66,16 +64,13 @@ def invoke_review_agent(state: AgentState) -> dict:
 def build_multi_agent():
     graph = StateGraph(AgentState)
 
-    # Nodes
     graph.add_node("router", route_request)
     graph.add_node("code_agent", invoke_code_agent)
     graph.add_node("research_agent", invoke_research_agent)
     graph.add_node("review_agent", invoke_review_agent)
 
-    # Entry
     graph.set_entry_point("router")
 
-    # Router dispatches to specialist or ends
     graph.add_conditional_edges(
         "router",
         pick_agent,
@@ -87,26 +82,8 @@ def build_multi_agent():
         },
     )
 
-    # Specialists loop back to router (router decides what's next)
     graph.add_edge("code_agent", "router")
     graph.add_edge("research_agent", "router")
     graph.add_edge("review_agent", "router")
 
     return graph.compile()
-
-
-def invoke_multi_agent(graph, user_message: str, messages: list) -> dict:
-    """Invoke the multi-agent graph with a clean state for each user turn.
-
-    Resets specialist outputs and iteration counter so previous turns
-    don't bleed into the router's decisions."""
-    return graph.invoke(
-        {
-            "messages": messages + [HumanMessage(content=user_message)],
-            "route": "",
-            "research_output": "",
-            "code_output": "",
-            "review_output": "",
-            "iteration": 0,
-        }
-    )
