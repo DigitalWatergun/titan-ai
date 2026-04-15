@@ -36,18 +36,84 @@ If the completed work fully answers the user's question, respond with "done".
 Respond with ONLY the category name, nothing else."""
 
 
-MAX_ITERATIONS = 5
+MAX_ITERATIONS = 3
+
+# Keywords that signal each agent type in the user's request
+CODE_KEYWORDS = [
+    "write a file",
+    "write file",
+    "create a file",
+    "create file",
+    "modify",
+    "edit",
+    "implement",
+    "save to",
+    "save as",
+]
+REVIEW_KEYWORDS = [
+    "review",
+    "check the code",
+    "find bugs",
+    "audit",
+]
+RESEARCH_KEYWORDS = [
+    "look up",
+    "search for",
+    "find",
+    "research",
+    "what is",
+    "how does",
+    "explain",
+]
+
+
+def _detect_required_steps(user_msg: str) -> list[str]:
+    """Detect what types of work the user is asking for, in order."""
+    msg_lower = user_msg.lower()
+    steps = []
+    if any(kw in msg_lower for kw in RESEARCH_KEYWORDS):
+        steps.append("research")
+    if any(kw in msg_lower for kw in CODE_KEYWORDS):
+        steps.append("code")
+    if any(kw in msg_lower for kw in REVIEW_KEYWORDS):
+        steps.append("review")
+    return steps
 
 
 def route_request(state: AgentState) -> dict:
-    """Classify the next step needed, or decide we're done."""
+    """Classify the next step needed, or decide we're done.
+
+    Uses deterministic keyword detection on the user's message first.
+    Falls back to LLM-based routing for ambiguous requests."""
     iteration = state.get("iteration", 0) + 1
 
     # Safety: force done after max iterations
     if iteration > MAX_ITERATIONS:
         return {"route": "done", "iteration": iteration}
 
-    # Build summary of what's been done
+    last_user_msg = ""
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_user_msg = str(msg.content)
+            break
+
+    # Deterministic routing based on keywords in user's request
+    required_steps = _detect_required_steps(last_user_msg)
+
+    if required_steps:
+        # Find the first required step that hasn't been completed
+        completed = {
+            "research": bool(state.get("research_output")),
+            "code": bool(state.get("code_output")),
+            "review": bool(state.get("review_output")),
+        }
+        for step in required_steps:
+            if not completed[step]:
+                return {"route": step, "iteration": iteration}
+        # All required steps done
+        return {"route": "done", "iteration": iteration}
+
+    # Fall back to LLM routing for ambiguous requests
     summary = []
     if state.get("research_output"):
         summary.append(f"Research completed: {state['research_output'][:200]}")
@@ -56,7 +122,6 @@ def route_request(state: AgentState) -> dict:
     if state.get("review_output"):
         summary.append(f"Review completed: {state['review_output'][:200]}")
 
-    # If any work has been done and we're past iteration 1, bias toward done
     if summary and iteration > 1:
         state_summary = (
             "\n".join(summary)
@@ -67,12 +132,6 @@ def route_request(state: AgentState) -> dict:
     else:
         state_summary = "Nothing yet — this is the first step."
 
-    last_user_msg = None
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            last_user_msg = msg.content
-            break
-
     prompt = ROUTER_PROMPT.format(state_summary=state_summary)
     response = router_llm.invoke(
         [SystemMessage(content=prompt), HumanMessage(content=last_user_msg)]
@@ -80,7 +139,7 @@ def route_request(state: AgentState) -> dict:
 
     route = str(response.content).strip().lower()
     if route not in ("code", "research", "review", "done"):
-        route = "code"  # Default fallback
+        route = "research"  # safer default than "code"
 
     return {"route": route, "iteration": iteration}
 
