@@ -15,9 +15,9 @@ $LLAMA_CPP \
   --alias "router" \
   --log-disable &
 
-# GPU 1: Code Agent (qwen2.5-coder-7b)
+# GPU 1: Code Agent (was qwen2.5-coder-7b but trying out qwen3-8b)
 $LLAMA_CPP \
-  --model $MODELS/qwen2.5-coder-7b-instruct.Q5_K_M.gguf \
+  --model $MODELS/qwen3-8b.Q5_K_M.gguf \
   --n-gpu-layers 999 \
   --split-mode none \
   --main-gpu 1 \

@@ -36,7 +36,11 @@ You have these tools available:
 Use search_codebase for project-specific questions. Use web_search for current
 information, documentation, or anything not in the codebase. Answer from your own
 knowledge when you're confident and the question doesn't require searching.
-Provide thorough, well-sourced answers. Be concise and direct."""
+Provide thorough, well-sourced answers. Be concise and direct.
+
+IMPORTANT: After ONE web_search or ONE search_codebase call, write your final answer
+based on the results. Do not call the same tool repeatedly. Do not try to write
+or create files — that's not your job."""
 
 
 def call_research_model(state: ResearchAgentState) -> dict:
