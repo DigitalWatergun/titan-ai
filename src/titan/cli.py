@@ -27,7 +27,7 @@ app = typer.Typer()
 console = Console()
 
 
-def _get_agent_name(namespace: tuple) -> str:
+def _get_agent_name(namespace: object) -> str:
     """Extract agent name from subgraph namespace."""
     ns_str = str(namespace)
     if "research_agent" in ns_str:
@@ -89,7 +89,7 @@ def chat(
             "context": "",
         }
         for namespace, event in agent.stream(input_state, subgraphs=True):
-            for key, value in event.items():
+            for key, value in event.items():  # type: ignore[misc]
                 # Only capture final messages from outer graph events
                 if namespace == () and "messages" in value:
                     final_messages = value["messages"]
@@ -110,6 +110,9 @@ def chat(
                         }
                         name = agent_names.get(route, route)
                         console.print(f"  [dim]🔀 Router → {name}[/dim]")
+                        console.print(
+                            f"  [dim]    {name} is thinking...[/dim]", end="\r"
+                        )
 
                 # Inner subgraph: model calls (tool requests and responses)
                 elif len(namespace) > 0 and key == "model":

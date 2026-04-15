@@ -12,18 +12,25 @@ router_llm = ChatOpenAI(
 )
 
 ROUTER_PROMPT = """/no_think
-You are Bridget, a request router. Based on the user's request and what has been completed so far, pick the NEXT step needed, or "done" if the task is complete.
+You are Bridget, a request router. Pick the NEXT step based on the user's request and what's been completed.
+
 Categories:
-- "code" — writing, editing, or creating code files
-- "research" — searching for information, documentation, or understanding concepts
-- "review" — reviewing existing code, finding bugs, suggesting improvements
-- "done" — the task is fully complete. Use this when the completed work already answers the user's request.
+- "research" — only for looking up information (web search, finding existing code in the codebase)
+- "code" — for writing, creating, or modifying ANY file (use this whenever the user asks to create/write/edit a file)
+- "review" — only AFTER code has been written or found, for analyzing it
+- "done" — task is fully complete
+
+Important rules:
+- If the user asks to "create a file" or "write a file" → ALWAYS route to "code", never "research"
+- Research is only for gathering information, never for creating files
+- After research is complete and code needs to be written, route to "code"
+- After code is written and review is requested, route to "review"
 
 What has been completed so far:
 {state_summary}
 
-If the completed work above already answers the user's question, respond with "done".
 Respond with ONLY the category name, nothing else."""
+
 
 MAX_ITERATIONS = 5
 

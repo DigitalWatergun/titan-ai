@@ -34,6 +34,7 @@ You have these tools available — ALWAYS use them instead of writing code snipp
 - search_codebase: Search the indexed codebase by meaning
 
 Never write Python code to read files or list directories. Use your tools.
+Always start by listing the current directory with "." — never guess paths.
 Always read existing code before modifying it. Explain what you changed and why.
 Be concise and direct in your responses."""
 
