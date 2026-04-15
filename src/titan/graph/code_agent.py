@@ -1,12 +1,12 @@
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from pydantic import SecretStr
 
+from titan.llm import ChatOpenAIWithReasoning as ChatOpenAI
 from titan.tools.filesystem import list_directory, read_file, write_file
 from titan.tools.rag import search_codebase
 from titan.tools.shell import run_command

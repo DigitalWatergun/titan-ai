@@ -118,6 +118,22 @@ def chat(
                 elif len(namespace) > 0 and key == "model":
                     agent_name = _get_agent_name(namespace)
                     last_msg = value["messages"][-1]
+
+                    # Show reasoning if present (Qwen3 thinking mode)
+                    reasoning = (
+                        last_msg.additional_kwargs.get("reasoning_content")
+                        if hasattr(last_msg, "additional_kwargs")
+                        else None
+                    )
+                    if reasoning:
+                        first_lines = [
+                            line for line in reasoning.split("\n") if line.strip()
+                        ][:3]
+                        for line in first_lines:
+                            console.print(
+                                f"  [dim italic]    💭 {agent_name} thinking: {line[:120]}[/dim italic]"
+                            )
+
                     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
                         for tc in last_msg.tool_calls:
                             console.print(
