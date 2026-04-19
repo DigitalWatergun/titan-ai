@@ -16,9 +16,9 @@ sleep 15
 
 # Health check — verify each server is responding
 if curl -s "http://localhost:8001/health" > /dev/null 2>&1; then
-    echo "✅ $name (port 8001) — UP"
+    echo "✅ Titan (port 8001) — UP"
 else
-    echo "❌ $name (port 8001) — DOWN (check logs)"
+    echo "❌ Titan (port 8001) — DOWN (check logs)"
 fi
 
 echo ""
