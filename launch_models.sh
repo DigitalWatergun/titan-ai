@@ -3,65 +3,23 @@
 
 LLAMA_CPP=~/Documents/Development/git_repos/llama.cpp/build/bin/llama-server
 MODELS=~/models
+MODEL=$MODELS/qwen3.5-27b.Q4_K_M.gguf
 
-# GPU 0: Router (qwen2.5-3b) — fast classification
+
 $LLAMA_CPP \
-  --model $MODELS/qwen3-8b.Q5_K_M.gguf \
-  --n-gpu-layers 999 \
-  --split-mode none \
-  --main-gpu 0 \
+  --model $MODEL \
   --port 8001 \
-  --ctx-size 2048 \
-  --alias "router" \
   --log-disable &
 
-# GPU 1: Code Agent (was qwen2.5-coder-7b but trying out qwen3-8b)
-$LLAMA_CPP \
-  --model $MODELS/qwen3-8b.Q5_K_M.gguf \
-  --n-gpu-layers 999 \
-  --split-mode none \
-  --main-gpu 1 \
-  --port 8002 \
-  --ctx-size 16384 \
-  --alias "code" \
-  --log-disable &
-
-# GPU 2: Research Agent (qwen2.5-7b)
-$LLAMA_CPP \
-  --model $MODELS/qwen3-8b.Q5_K_M.gguf \
-  --n-gpu-layers 999 \
-  --split-mode none \
-  --main-gpu 2 \
-  --port 8003 \
-  --ctx-size 16384 \
-  --alias "research" \
-  --log-disable &
-
-# GPU 3: Review Agent (llama-3.1-8b)
-$LLAMA_CPP \
-  --model $MODELS/llama-3.1-8b-instruct.Q5_K_M.gguf \
-  --n-gpu-layers 999 \
-  --split-mode none \
-  --main-gpu 3 \
-  --port 8004 \
-  --ctx-size 8192 \
-  --alias "review" \
-  --log-disable &
-
-echo "All models launched. Waiting for servers to be ready..."
-sleep 5
+echo "Waiting for server to be ready..."
+sleep 15
 
 # Health check — verify each server is responding
-SERVERS=("Router:8001" "Code:8002" "Research:8003" "Review:8004")
-for server in "${SERVERS[@]}"; do
-    name="${server%%:*}"
-    port="${server##*:}"
-    if curl -s "http://localhost:$port/health" > /dev/null 2>&1; then
-        echo "✅ $name (port $port) — UP"
-    else
-        echo "❌ $name (port $port) — DOWN (check logs)"
-    fi
-done
+if curl -s "http://localhost:8001/health" > /dev/null 2>&1; then
+    echo "✅ $name (port 8001) — UP"
+else
+    echo "❌ $name (port 8001) — DOWN (check logs)"
+fi
 
 echo ""
 echo "Verify GPU assignment: nvidia-smi"

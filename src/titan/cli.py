@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from titan.graph import build_multi_agent
+from titan.agent import build_agent
 from titan.graph.state import AgentState
 from titan.rag.indexer import index_codebase
 
@@ -66,7 +66,7 @@ def chat(
         )
     )
 
-    agent = build_multi_agent()
+    agent = build_agent()
     messages: list = []
 
     while True:
@@ -88,7 +88,7 @@ def chat(
             "working_directory": "",
             "context": "",
         }
-        for namespace, event in agent.stream(input_state, subgraphs=True):
+        for namespace, event in agent.stream(input_state):
             for key, value in event.items():  # type: ignore[misc]
                 # Only capture final messages from outer graph events
                 if namespace == () and "messages" in value:
