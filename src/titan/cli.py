@@ -59,8 +59,29 @@ def chat(
 
     while True:
         user_input = console.input("[bold blue]You:[/] ")
-        if user_input.lower() in ("quit", "exit", "q"):
-            break
+        if user_input.startswith("/"):
+            command = user_input.strip().lower()
+            if command == "/quit":
+                break
+            elif command == "/clear":
+                messages = []
+                console.print("[dim]Conversation cleared.[/dim]")
+                continue
+            elif command == "/help":
+                console.print("[dim]/clear — clear conversation[/dim]")
+                console.print("[dim]/index — index current directory[/dim]")
+                console.print("[dim]/quit  — exit[/dim]")
+                continue
+            elif command.startswith("/index"):
+                parts = user_input.strip().split(maxsplit=1)
+                directory = parts[1] if len(parts) > 1 else "."
+                console.print(f"Indexing [bold]{directory}[/]...")
+                count = index_codebase(directory)
+                console.print(f"[dim]Indexed {count} chunks from {directory}[/dim]")
+                continue
+            else:
+                console.print(f"[dim]Unknown command: {command}[/dim]")
+                continue
 
         messages.append(HumanMessage(content=user_input))
 
@@ -105,15 +126,6 @@ def chat(
         console.print()
         console.print(Markdown(ai_message.content))
         console.print()
-
-
-@app.command()
-def index(directory: str = typer.Argument(".", help="Directory to index")):
-    """Index a codebase into the vector database for RAG search."""
-
-    console.print(f"Indexing [bold]{directory}[/]...")
-    count = index_codebase(directory)
-    console.print(f"Indexed [green]{count}[/] chunks into ChromaDB")
 
 
 if __name__ == "__main__":
