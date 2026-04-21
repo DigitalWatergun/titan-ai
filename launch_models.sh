@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/Documents/Development/git_repos/titan-ai/launch_models.sh
+# Run this script on the Titan workstation
 
 LLAMA_CPP=~/Documents/Development/git_repos/llama.cpp/build/bin/llama-server
 MODELS=~/models

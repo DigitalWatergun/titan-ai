@@ -1,5 +1,7 @@
+import os
 from typing import Annotated, TypedDict
 
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
@@ -11,6 +13,8 @@ from titan.tools.filesystem import list_directory, read_file, write_file
 from titan.tools.rag import search_codebase
 from titan.tools.search import web_search
 from titan.tools.shell import run_command
+
+load_dotenv()
 
 
 class AgentState(TypedDict):
@@ -27,9 +31,9 @@ tools = [
 ]
 
 llm = ChatOpenAI(
-    base_url="http://localhost:8001/v1",
+    base_url=os.getenv("TITAN_LLM_URL", "http://localhost:8001/v1"),
     api_key=SecretStr("not-needed"),
-    model="titan",
+    model=os.getenv("TITAN_MODEL_NAME", "titan"),
     temperature=0,
 ).bind_tools(tools)
 
@@ -76,9 +80,9 @@ def build_agent():
                ↓            ↓
              "tools"        END → response to user
                ↓
-          ToolNode (executes the tool)
+           ToolNode (executes the tool)
                ↓
-          call_model (LLM sees tool result, decides next action)
+           call_model (LLM sees tool result, decides next action)
                ... (loops until LLM responds without tool calls)
     """
     graph = StateGraph(AgentState)
