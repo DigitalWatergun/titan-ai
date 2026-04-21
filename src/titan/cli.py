@@ -27,7 +27,7 @@ app = typer.Typer()
 console = Console()
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def chat(
     working_dir: str = typer.Option(".", help="Working directory for the agent"),
     index: bool = typer.Option(
@@ -70,7 +70,7 @@ def chat(
                 if key == "agent":
                     last_msg = value["messages"][-1]
 
-                    # Show reasoning if present (Qwen3 thinking mode)
+                    # Show reasoning if present (Qwen3.5 thinking mode)
                     reasoning = (
                         last_msg.additional_kwargs.get("reasoning_content")
                         if hasattr(last_msg, "additional_kwargs")
@@ -82,7 +82,7 @@ def chat(
                         ][:3]
                         for line in first_lines:
                             console.print(
-                                f"  [dim italic]💭 Titan thinking: {line[:120]}[/dim italic]"
+                                f"  [dim italic]💭 Titan thinking: {line[:120]}...[/dim italic]"
                             )
 
                     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
