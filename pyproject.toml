@@ -17,6 +17,7 @@ dependencies = [
     "sentence-transformers>=5.4.0",
     "python-dotenv>=1.0.0",
     "typer>=0.24.1",
+    "textual>=8.2.4",
 ]
 
 [project.scripts]

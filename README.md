@@ -1,17 +1,6 @@
 # Titan
 
-A local multi-agent coding assistant built with LangGraph, RAG, and local LLMs running on 4x Titan XP GPUs. Works as both a coding assistant and a general-purpose AI.
-
-## Agents
-
-| Agent       | GPU               | Role                                                    | Model            |
-| ----------- | ----------------- | ------------------------------------------------------- | ---------------- |
-| **Bridget** | GPU 0 (port 8001) | Router — classifies requests and chains agents          | qwen3:8b         |
-| **Cody**    | GPU 1 (port 8002) | Code — writes, edits, and debugs code                   | qwen2.5-coder:7b |
-| **Paige**   | GPU 2 (port 8003) | Research — answers questions, searches web and codebase | qwen3:8b         |
-| **Mark**    | GPU 3 (port 8004) | Review — reviews code and suggests improvements         | llama3.1:8b      |
-
-For complex tasks, the router chains multiple agents in sequence (e.g., research -> code -> review).
+A local coding assistant built with LangGraph, RAG, and Qwen3.5 27B running across 4x Titan XP GPUs via pipeline parallelism. Textual-based TUI with streaming responses, tool call visibility, and semantic code search.
 
 ## Setup
 
@@ -20,27 +9,55 @@ git clone git@github.com:digitalwatergun/titan-ai.git
 cd titan-ai
 
 uv sync
-uv tool install --editable .
 ```
 
-## Usage
+## Running
 
 ```bash
-# Start the llama.cpp servers (run in a tmux pane)
+# Start the llama.cpp server on the Titan workstation
 ./launch_models.sh
 
-# General questions
-titan chat
+# Run from the project directory
+uv run titan
 
-# Work on a codebase with indexing
-titan chat --index
-
-# Index a codebase explicitly
-titan index
+# Or run in a specific directory
+uv run titan --working-dir ~/projects/my-app
 ```
+
+### Global Install
+
+To run `titan` from any directory without activating the venv:
+
+```bash
+uv tool install /path/to/titan-ai
+
+# Then just cd into any project and run
+cd ~/projects/my-app
+titan
+```
+
+Re-run `uv tool install` after code changes to update.
+
+### Remote CLI (Mac → Workstation)
+
+Titan can run on your Mac with LLM inference on the workstation over Tailscale. Set the endpoint in `.env`:
+
+```bash
+cp .env.example .env
+# Edit .env to point TITAN_LLM_URL at the workstation's Tailscale IP
+```
+
+## Slash Commands
+
+| Command  | Purpose                                      |
+| -------- | -------------------------------------------- |
+| `/index` | Index current directory (or `/index <path>`) |
+| `/clear` | Clear conversation history                   |
+| `/help`  | List available commands                      |
+| `/quit`  | Exit                                         |
 
 ## Project Status
 
-Currently in **Phase 3** — Multi-agent system with LangGraph and llama.cpp.
+Currently in **Phase 4** — Textual TUI, conversation persistence, multi-project indexing.
 
 See the full project guide for the roadmap through all 5 phases.

@@ -9,6 +9,7 @@ MODEL=$MODELS/qwen3.5-27b.Q4_K_M.gguf
 $LLAMA_CPP \
   --model $MODEL \
   --port 8001 \
+  --host 0.0.0.0 \
   --log-disable &
 
 echo "Waiting for server to be ready..."
