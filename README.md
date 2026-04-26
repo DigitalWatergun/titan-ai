@@ -1,6 +1,6 @@
 # Titan
 
-A local coding assistant built with LangGraph, RAG, and Qwen3.5 27B running across 4x Titan XP GPUs via pipeline parallelism. Textual-based TUI with streaming responses, tool call visibility, and semantic code search.
+A local coding assistant built with LangGraph, RAG, and Qwen3.6 27B running across 4x Titan XP GPUs via pipeline parallelism. Textual-based TUI with streaming responses, tool call visibility, and semantic code search.
 
 ## Setup
 

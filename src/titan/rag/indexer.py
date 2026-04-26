@@ -10,27 +10,43 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from titan.rag.chunker import chunk_file, collect_files
 
 
+def _patch_tqdm():
+    """Prevent tqdm from creating multiprocessing locks.
+
+    tqdm's __new__ always calls create_mp_lock() even when disabled,
+    which spawns a resource tracker subprocess. Inside Textual's TUI,
+    the file descriptors are in a state that causes this spawn to fail
+    with 'bad value(s) in fds_to_keep' on macOS.
+    """
+    import tqdm.std
+
+    lock_class = getattr(tqdm.std, "TqdmDefaultWriteLock", None)
+    if lock_class is not None:
+        lock_class.create_mp_lock = classmethod(
+            lambda cls: setattr(cls, "mp_lock", None)
+        )
+
+
 def create_embeddings():
     """Create the embedding function."""
-    # Suppress at file descriptor level to catch all output,
-    # including HuggingFace trust_remote_code warnings that
-    # bypass Python's sys.stderr
-    devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    old_stderr_fd = os.dup(2)
-    old_stdout_fd = os.dup(1)
-    os.dup2(devnull_fd, 2)
-    os.dup2(devnull_fd, 1)
-    try:
+    import contextlib
+    import io
+    import warnings
+
+    os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+    _patch_tqdm()
+
+    with (
+        warnings.catch_warnings(),
+        contextlib.redirect_stderr(io.StringIO()),
+        contextlib.redirect_stdout(io.StringIO()),
+    ):
+        warnings.simplefilter("ignore")
         embeddings = HuggingFaceEmbeddings(
             model_name="nomic-ai/nomic-embed-text-v1",
             model_kwargs={"trust_remote_code": True, "device": "cpu"},
+            show_progress=False,
         )
-    finally:
-        os.dup2(old_stderr_fd, 2)
-        os.dup2(old_stdout_fd, 1)
-        os.close(devnull_fd)
-        os.close(old_stderr_fd)
-        os.close(old_stdout_fd)
     return embeddings
 
 
