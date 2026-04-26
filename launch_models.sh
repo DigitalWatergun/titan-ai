@@ -3,7 +3,7 @@
 
 LLAMA_CPP=~/Documents/Development/git_repos/llama.cpp/build/bin/llama-server
 MODELS=~/models
-MODEL=$MODELS/qwen3.5-27b.Q4_K_M.gguf
+MODEL=$MODELS/qwen3.6-27b.Q4_K_M.gguf
 
 
 $LLAMA_CPP \
