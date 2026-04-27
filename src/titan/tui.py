@@ -9,6 +9,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.events import Key
 from textual.timer import Timer
 from textual.widgets import Input, RichLog, Static
 from textual.worker import get_current_worker
@@ -102,7 +103,12 @@ class TitanApp(App):
         self._thinking_timer: Timer | None = None
         self._start_time = 0.0
         self._total_tokens = 0
+        self._context_used = 0
+        self._context_max = 0
         self._show_full_thinking = False
+        self._input_history: list[str] = []
+        self._history_index = 0
+        self._saved_input = ""
 
     def compose(self) -> ComposeResult:
         chat_log = RichLog(id="chat-log", wrap=True, highlight=False, markup=True)
@@ -144,6 +150,9 @@ class TitanApp(App):
         parts = ["Titan", time_str]
         if self._total_tokens > 0:
             parts.append(f"{self._total_tokens:,} tokens")
+        if self._context_max > 0 and self._context_used > 0:
+            pct = int(self._context_used / self._context_max * 100)
+            parts.append(f"{pct}% ctx")
         if suffix:
             parts.append(suffix)
         return "  ".join(parts)
@@ -182,11 +191,27 @@ class TitanApp(App):
     def action_scroll_down(self) -> None:
         self.query_one("#chat-log", RichLog).scroll_page_down()
 
+    def _fetch_context_size(self) -> None:
+        import os
+
+        import httpx
+
+        llm_url = os.getenv("TITAN_LLM_URL", "http://localhost:8001/v1")
+        base_url = llm_url.removesuffix("/v1")
+        try:
+            resp = httpx.get(f"{base_url}/props", timeout=5)
+            data = resp.json()
+            settings = data.get("default_generation_settings", {})
+            self._context_max = settings.get("n_ctx", 0)
+        except Exception:
+            self._context_max = 0
+
     def on_mount(self) -> None:
         import os
 
         os.chdir(self.working_dir)
         self.agent = build_agent()
+        self._fetch_context_size()
 
         log = self.query_one("#chat-log", RichLog)
 
@@ -207,10 +232,34 @@ class TitanApp(App):
         )
         log.write("")
 
+    def on_key(self, event: Key) -> None:
+        input_widget = self.query_one("#input-box", Input)
+        if event.key == "up":
+            if self._input_history and self._history_index > 0:
+                if self._history_index == len(self._input_history):
+                    self._saved_input = input_widget.value
+                self._history_index -= 1
+                input_widget.value = self._input_history[self._history_index]
+                input_widget.cursor_position = len(input_widget.value)
+            event.prevent_default()
+        elif event.key == "down":
+            if self._history_index < len(self._input_history):
+                self._history_index += 1
+                if self._history_index == len(self._input_history):
+                    input_widget.value = self._saved_input
+                else:
+                    input_widget.value = self._input_history[self._history_index]
+                input_widget.cursor_position = len(input_widget.value)
+            event.prevent_default()
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         user_input = event.value.strip()
         if not user_input:
             return
+
+        self._input_history.append(user_input)
+        self._history_index = len(self._input_history)
+        self._saved_input = ""
 
         input_widget = self.query_one("#input-box", Input)
         input_widget.value = ""
@@ -310,6 +359,9 @@ class TitanApp(App):
                     usage = getattr(last_msg, "usage_metadata", None)
                     if usage:
                         self._total_tokens += usage.get("total_tokens", 0)
+                        input_tokens = usage.get("input_tokens", 0)
+                        if input_tokens > 0:
+                            self._context_used = input_tokens
 
                     # Show reasoning
                     reasoning = (
@@ -361,6 +413,9 @@ class TitanApp(App):
         usage = getattr(ai_message, "usage_metadata", None)
         if usage:
             self._total_tokens += usage.get("total_tokens", 0)
+            input_tokens = usage.get("input_tokens", 0)
+            if input_tokens > 0:
+                self._context_used = input_tokens
 
         self.call_from_thread(log.write, "")
         self.call_from_thread(log.write, Markdown(ai_message.content))
