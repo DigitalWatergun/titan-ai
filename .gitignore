@@ -208,3 +208,7 @@ __marimo__/
 
 # TitanAI ChromaDb
 .titan
+
+# Services environment settings
+services/searxng/settings.yaml
+
