@@ -1,5 +1,6 @@
 # src/titan/tools/search.py
 import logging
+import os
 
 import httpx
 from langchain_core.tools import tool
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-SEARXNG_URL = "http://100.71.123.18:8080"  # Your Tailscale SearXNG
+SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://localhost:8080")
 
 
 class WebSearchInput(BaseModel):
