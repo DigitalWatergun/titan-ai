@@ -1,6 +1,8 @@
 # Titan
 
-A local coding assistant built with LangGraph, RAG, and Qwen3.6 27B running across 4x Titan XP GPUs via pipeline parallelism. Textual-based TUI with streaming responses, tool call visibility, and semantic code search.
+A local coding assistant built with LangGraph, RAG, and Qwen3.6 27B. Textual-based TUI with streaming responses, tool call visibility, and semantic code search.
+
+Runs on three hosts: M5 Max (Metal, primary dev), Astral (RTX 5090), and the original 4× Titan XP box (pipeline parallel).
 
 ## Setup
 
@@ -9,42 +11,53 @@ git clone git@github.com:digitalwatergun/titan-ai.git
 cd titan-ai
 
 uv sync
+cp .env.example .env
 ```
 
-## Running
+## Services
+
+`llama-server` plus the SearXNG + OpenWebUI stack live in [`services/`](services/README.md). Bring them up there before running `titan`:
 
 ```bash
-# Start the llama.cpp server on the Titan workstation
-./launch_models.sh
+# In one terminal — start llama-server
+cd services
+./launch_models_m5max.sh        # or _astral.sh / _titan.sh
 
-# Run from the project directory
+# In another — start the compose stack
+docker compose up -d
+```
+
+See `services/README.md` for the full bring-up sequence, ports, and troubleshooting.
+
+## Running the agent
+
+```bash
+# From the project directory
 uv run titan
 
-# Or run in a specific directory
+# Or against a specific working directory
 uv run titan --working-dir ~/projects/my-app
 ```
 
-### Global Install
+### Global install
 
-To run `titan` from any directory without activating the venv:
+Run `titan` from any directory without activating the venv:
 
 ```bash
 uv tool install /path/to/titan-ai
 
-# Then just cd into any project and run
 cd ~/projects/my-app
 titan
 ```
 
 Re-run `uv tool install` after code changes to update.
 
-### Remote CLI (Mac → Workstation)
+### Remote CLI (Mac → workstation)
 
-Titan can run on your Mac with LLM inference on the workstation over Tailscale. Set the endpoint in `.env`:
+`titan` can run on one host with `llama-server` on another over Tailscale. Edit `.env`:
 
-```bash
-cp .env.example .env
-# Edit .env to point TITAN_LLM_URL at the workstation's Tailscale IP
+```
+TITAN_LLM_URL=http://<workstation-tailscale-ip>:8001/v1
 ```
 
 ## Slash Commands
@@ -60,4 +73,4 @@ cp .env.example .env
 
 Currently in **Phase 4** — Textual TUI, conversation persistence, multi-project indexing.
 
-See the full project guide for the roadmap through all 5 phases.
+See the project guide in the Obsidian vault for the full roadmap.
