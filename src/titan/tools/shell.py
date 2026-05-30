@@ -1,7 +1,6 @@
 import logging
 import subprocess
 
-from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -19,22 +18,27 @@ BLOCKED_COMMANDS = [
 
 
 class RunCommandInput(BaseModel):
+    """Run a shell command and return stdout and stderr.
+    Use this for running tests, checking git status, installing packages, etc."""
+
     command: str = Field(description="Shell command to execute")
 
 
-@tool(args_schema=RunCommandInput)
-def run_command(command: str) -> str:
-    """Run a shell command and return stdout and stderr.
-    Use this for running tests, checking git status, installing packages. etc."""
+def run_command(args: RunCommandInput) -> str:
     # Safety: block known destructive commands
     for blocked in BLOCKED_COMMANDS:
-        if blocked in command:
-            logger.warning(f"Blocked destructive command: {command}")
-            return f"BLOCKED: '{command}' matches blocked pattern '{blocked}'. Refusing to execute."
+        if blocked in args.command:
+            logger.warning(f"Blocked destructive command: {args.command}")
+            return f"BLOCKED: '{args.command}' matches blocked pattern '{blocked}'. Refusing to execute."
 
     try:
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=30, cwd=None
+            args.command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=None,
         )
         output = ""
         if result.stdout:
@@ -42,10 +46,10 @@ def run_command(command: str) -> str:
         if result.stderr:
             output += f"STDERR:\n{result.stderr}\n"
         output += f"Return code: {result.returncode}"
-        return output or "Command complated with no output"
+        return output or "Command completed with no output"
     except subprocess.TimeoutExpired:
-        logger.exception(f"Command timed out: {command}")
+        logger.exception(f"Command timed out: {args.command}")
         return "Error: Command timed out after 30 seconds"
     except Exception as e:
-        logger.exception(f"Failed to run command: {command}")
+        logger.exception(f"Failed to run command: {args.command}")
         return f"Error running command: {e}"

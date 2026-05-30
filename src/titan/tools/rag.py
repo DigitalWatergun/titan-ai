@@ -1,13 +1,17 @@
 import chromadb
-from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 
 from titan.rag.indexer import create_embeddings
 
 
-@tool
-def search_codebase(query: str) -> str:
+class SearchCodebaseInput(BaseModel):
     """Search the indexed codebase for code relevant to the query.
     Use this to find where things are implemented, understand patterns, etc."""
+
+    query: str = Field(description="Query string to find matching code chunks")
+
+
+def search_codebase(args: SearchCodebaseInput) -> str:
     try:
         client = chromadb.PersistentClient(path=".titan/chromadb")
         collection = client.get_collection("codebase")
@@ -17,7 +21,7 @@ def search_codebase(query: str) -> str:
     n_results = 5
 
     embeddings = create_embeddings()
-    query_vector = embeddings.encode(query).tolist()
+    query_vector = embeddings.encode(args.query).tolist()
 
     results = collection.query(
         query_embeddings=[query_vector],
