@@ -17,7 +17,7 @@ def search_codebase(query: str) -> str:
     n_results = 5
 
     embeddings = create_embeddings()
-    query_vector = embeddings.embed_query(query)
+    query_vector = embeddings.encode(query).tolist()
 
     results = collection.query(
         query_embeddings=[query_vector],

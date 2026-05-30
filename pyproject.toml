@@ -9,7 +9,6 @@ dependencies = [
     "einops>=0.8.2",
     "httpx>=0.28.1",
     "langchain>=1.2.14",
-    "langchain-huggingface>=1.2.1",
     "langchain-openai>=1.1.12",
     "langgraph>=1.1.4",
     "rich>=14.3.3",
