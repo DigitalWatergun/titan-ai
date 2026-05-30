@@ -5,7 +5,7 @@ from typing import cast
 
 import chromadb
 from chromadb.api.types import Embedding
-from langchain_huggingface import HuggingFaceEmbeddings
+from sentence_transformers import SentenceTransformer
 
 from titan.rag.chunker import chunk_file, collect_files
 
@@ -42,12 +42,10 @@ def create_embeddings():
         contextlib.redirect_stdout(io.StringIO()),
     ):
         warnings.simplefilter("ignore")
-        embeddings = HuggingFaceEmbeddings(
-            model_name="nomic-ai/nomic-embed-text-v1",
-            model_kwargs={"trust_remote_code": True, "device": "cpu"},
-            show_progress=False,
+        model = SentenceTransformer(
+            "nomic-ai/nomic-embed-text-v1", trust_remote_code=True, device="cpu"
         )
-    return embeddings
+    return model
 
 
 def index_codebase(
@@ -102,7 +100,7 @@ def index_codebase(
             on_progress(f"Embedding... ({batch_idx + 1}/{total_batches} batches)")
         batch = all_chunks[i : i + batch_size]
         texts = [c.content for c in batch]
-        vectors = embeddings.embed_documents(texts)
+        vectors = embeddings.encode(texts, show_progress_bar=False).tolist()
 
         collection.add(
             ids=[f"chunk_{i + j}" for j in range(len(batch))],
