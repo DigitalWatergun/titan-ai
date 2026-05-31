@@ -1,6 +1,9 @@
 import logging
 
 import typer
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)

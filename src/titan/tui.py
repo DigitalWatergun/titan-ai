@@ -1,7 +1,7 @@
+import asyncio
+import os
 import time
 
-from langchain_core.messages import HumanMessage
-from langgraph.graph.state import CompiledStateGraph
 from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.panel import Panel
@@ -12,9 +12,9 @@ from textual.containers import Horizontal, Vertical
 from textual.events import Key
 from textual.timer import Timer
 from textual.widgets import Input, RichLog, Static
-from textual.worker import get_current_worker
 
-from titan.agent import build_agent
+from titan.agents import MAIN_AGENT
+from titan.loop import run_turn
 from titan.rag.indexer import index_codebase
 
 
@@ -97,8 +97,7 @@ class TitanApp(App):
     def __init__(self, working_dir: str = "."):
         super().__init__()
         self.working_dir = working_dir
-        self.agent: CompiledStateGraph | None = None
-        self.messages: list = []
+        self.messages: list[dict] = []
         self._thinking_dots = 0
         self._thinking_timer: Timer | None = None
         self._start_time = 0.0
@@ -207,10 +206,8 @@ class TitanApp(App):
             self._context_max = 0
 
     def on_mount(self) -> None:
-        import os
 
         os.chdir(self.working_dir)
-        self.agent = build_agent()
         self._fetch_context_size()
 
         log = self.query_one("#chat-log", RichLog)
@@ -341,86 +338,70 @@ class TitanApp(App):
                 log.write, f"[dim]Full traceback written to {log_path}[/dim]"
             )
 
-    @work(thread=True)
-    def _run_agent(self, user_input: str, log: RichLog) -> None:
-        assert self.agent is not None
-        self.messages.append(HumanMessage(content=user_input))
-        worker = get_current_worker()
+    @work
+    async def _run_agent(self, user_input: str, log: RichLog) -> None:
+        self.messages.append({"role": "user", "content": user_input})
 
-        for event in self.agent.stream({"messages": self.messages}):
-            if worker.is_cancelled:
-                return
+        token_buffer: list[str] = []
 
-            for key, value in event.items():
-                if key == "agent":
-                    last_msg = value["messages"][-1]
+        def flush_text():
+            """Render accumulated tokens as Markdown, then clear the buffer."""
+            if token_buffer:
+                text = "".join(token_buffer)
+                log.write("")
+                log.write(Markdown(text))
+                log.write("")
+                token_buffer.clear()
 
-                    # Accumulate tokens
-                    usage = getattr(last_msg, "usage_metadata", None)
-                    if usage:
-                        self._total_tokens += usage.get("total_tokens", 0)
-                        input_tokens = usage.get("input_tokens", 0)
-                        if input_tokens > 0:
-                            self._context_used = input_tokens
+        try:
+            async for event in run_turn(MAIN_AGENT, self.messages):
+                match event:
+                    case ("token", text):
+                        token_buffer.append(text)
 
-                    # Show reasoning
-                    reasoning = (
-                        last_msg.additional_kwargs.get("reasoning_content")
-                        if hasattr(last_msg, "additional_kwargs")
-                        else None
-                    )
-                    if reasoning and reasoning.strip():
+                    case ("reasoning", text):
                         if self._show_full_thinking:
-                            thought = Text(f"💭 {reasoning}", style="dim italic")
+                            thought = Text(f"💭 {text}", style="dim italic")
                         else:
                             summary = " ".join(
-                                line for line in reasoning.split("\n") if line.strip()
+                                line for line in text.split("\n") if line.strip()
                             )
                             if len(summary) > 150:
                                 summary = summary[:150] + "..."
                             thought = Text(f"💭 {summary}", style="dim italic")
-                        self.call_from_thread(log.write, Padding(thought, (0, 0, 0, 2)))
+                        log.write(Padding(thought, (0, 0, 0, 2)))
 
-                    # Show tool calls
-                    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
-                        for tc in last_msg.tool_calls:
-                            tool_text = Text(
-                                f"→ {tc['name']}({tc['args']})", style="dim"
+                    case ("tool_call", name, args):
+                        # Flush any accumulated text before the tool runs
+                        flush_text()
+                        log.write(
+                            Padding(
+                                Text(f"→ {name}({args})", style="dim"), (0, 0, 0, 2)
                             )
-                            self.call_from_thread(
-                                log.write, Padding(tool_text, (0, 0, 0, 2))
+                        )
+
+                    case ("tool_result", name, result):
+                        snippet = result.replace("\n", " ").strip()
+                        if len(snippet) > 80:
+                            snippet = snippet[:80] + "..."
+                        log.write(
+                            Padding(
+                                Text(f"✓ {name} → {snippet}", style="dim"), (0, 0, 0, 2)
                             )
+                        )
 
-                elif key == "tools":
-                    for msg in value["messages"]:
-                        if hasattr(msg, "name"):
-                            self.call_from_thread(
-                                log.write,
-                                Padding(
-                                    Text(f"✓ {msg.name} completed", style="dim"),
-                                    (0, 0, 0, 2),
-                                ),
-                            )
+            # Loop exited cleanly — flush any final text
+            flush_text()
 
-        if worker.is_cancelled:
-            return
+        except asyncio.CancelledError:
+            # _cancel_agent already wrote "Interrupted" and stopped the spinner.
+            raise
 
-        # Get final response
-        result = self.agent.invoke({"messages": self.messages})
-        self.messages = result["messages"]
+        except Exception as e:
+            log.write(f"[red]Agent error: {e}[/red]")
 
-        ai_message = self.messages[-1]
-        usage = getattr(ai_message, "usage_metadata", None)
-        if usage:
-            self._total_tokens += usage.get("total_tokens", 0)
-            input_tokens = usage.get("input_tokens", 0)
-            if input_tokens > 0:
-                self._context_used = input_tokens
-
-        self.call_from_thread(log.write, "")
-        self.call_from_thread(log.write, Markdown(ai_message.content))
-        self.call_from_thread(log.write, "")
-        self.call_from_thread(self._stop_thinking)
+        finally:
+            self._stop_thinking()
 
 
 def run(working_dir: str = "."):
