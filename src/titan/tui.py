@@ -269,7 +269,7 @@ class TitanApp(App):
             ("❯ ", "#4a90c2"),
             (user_input, "#ffffff"),
         )
-        log.write(Padding(user_msg, (0, 2), style="on #2a2a2a"), expand=True)
+        log.write(Padding(user_msg, (0), style="on #2a2a2a"), expand=True)
         log.write("")
 
         # Handle slash commands
@@ -343,9 +343,15 @@ class TitanApp(App):
         self.messages.append({"role": "user", "content": user_input})
 
         token_buffer: list[str] = []
+        reasoning_buffer: list[str] = []
 
         def flush_text():
             """Render accumulated tokens as Markdown, then clear the buffer."""
+            if reasoning_buffer:
+                text = "".join(reasoning_buffer)
+                thought = Text(f"💭 {text}", style="dim italic")
+                log.write(thought)
+                reasoning_buffer.clear()
             if token_buffer:
                 text = "".join(token_buffer)
                 log.write("")
@@ -354,41 +360,25 @@ class TitanApp(App):
                 token_buffer.clear()
 
         try:
+            last_event_type = None
             async for event in run_turn(MAIN_AGENT, self.messages):
+                event_type = event[0]
+                if last_event_type and last_event_type != event_type:
+                    flush_text()
+                last_event_type = event_type
+
                 match event:
+                    case ("reasoning", text):
+                        reasoning_buffer.append(text)
                     case ("token", text):
                         token_buffer.append(text)
-
-                    case ("reasoning", text):
-                        if self._show_full_thinking:
-                            thought = Text(f"💭 {text}", style="dim italic")
-                        else:
-                            summary = " ".join(
-                                line for line in text.split("\n") if line.strip()
-                            )
-                            if len(summary) > 150:
-                                summary = summary[:150] + "..."
-                            thought = Text(f"💭 {summary}", style="dim italic")
-                        log.write(Padding(thought, (0, 0, 0, 2)))
-
                     case ("tool_call", name, args):
-                        # Flush any accumulated text before the tool runs
-                        flush_text()
-                        log.write(
-                            Padding(
-                                Text(f"→ {name}({args})", style="dim"), (0, 0, 0, 2)
-                            )
-                        )
-
+                        log.write(Text(f"→ {name}({args})", style="dim"))
                     case ("tool_result", name, result):
                         snippet = result.replace("\n", " ").strip()
                         if len(snippet) > 80:
                             snippet = snippet[:80] + "..."
-                        log.write(
-                            Padding(
-                                Text(f"✓ {name} → {snippet}", style="dim"), (0, 0, 0, 2)
-                            )
-                        )
+                        log.write(Text(f"✓ {name} → {snippet}", style="dim"))
 
             # Loop exited cleanly — flush any final text
             flush_text()
