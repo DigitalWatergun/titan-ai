@@ -1,0 +1,37 @@
+Screen {
+    background: #1e1e1e;
+    padding: 1 2;
+}
+
+#chat-log {
+    height: 1fr;
+    padding: 1 0;
+    border: none;
+    background: #1e1e1e;
+    color: #ffffff;
+    scrollbar-size: 0 0;
+}
+
+#bottom-area {
+    dock: bottom;
+    height: auto;
+    background: #1e1e1e;
+}
+
+#input-box {
+    background: #2a2a2a;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    border-left: tall #4a90c2;
+    color: #ffffff;
+    padding: 1 2;
+}
+
+#input-box:focus {
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    border-left: tall #4a90c2;
+}
+

@@ -1,6 +1,5 @@
 import asyncio
 import os
-import time
 
 from rich.markdown import Markdown
 from rich.padding import Padding
@@ -8,84 +7,21 @@ from rich.panel import Panel
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.events import Key
-from textual.timer import Timer
-from textual.widgets import Input, RichLog, Static
+from textual.widgets import Input, RichLog
 
 from titan.agents import MAIN_AGENT
 from titan.loop import run_turn
 from titan.rag.indexer import index_codebase
+from titan.tui.widgets.status_bar import StatusBar
 
 
 class TitanApp(App):
     """Titan — Local Coding Assistant TUI"""
 
     TITLE = "Titan"
-
-    CSS = """
-    Screen {
-        background: #1e1e1e;
-        padding: 1 2;
-    }
-
-    #chat-log {
-        height: 1fr;
-        padding: 1 0;
-        border: none;
-        background: #1e1e1e;
-        color: #ffffff;
-        scrollbar-size: 0 0;
-    }
-
-
-
-    #bottom-area {
-        dock: bottom;
-        height: auto;
-        background: #1e1e1e;
-    }
-
-    #input-box {
-        background: #2a2a2a;
-        border-top: none;
-        border-right: none;
-        border-bottom: none;
-        border-left: tall #4a90c2;
-        color: #ffffff;
-        padding: 1 2;
-    }
-
-    #input-box:focus {
-        border-top: none;
-        border-right: none;
-        border-bottom: none;
-        border-left: tall #4a90c2;
-    }
-
-    #status-bar {
-        height: 1;
-        margin-top: 1;
-        background: #1e1e1e;
-        color: #666666;
-        padding: 0 1;
-    }
-
-    #status-left {
-        width: 1fr;
-        height: 1;
-        color: #4a90c2;
-        background: #1e1e1e;
-    }
-
-    #status-right {
-        width: auto;
-        height: 1;
-        color: #666666;
-        background: #1e1e1e;
-    }
-    """
-
+    CSS_PATH = "titan.tcss"
     BINDINGS = [
         ("ctrl+c", "safe_quit"),
         ("escape", "interrupt"),
@@ -98,12 +34,6 @@ class TitanApp(App):
         super().__init__()
         self.working_dir = working_dir
         self.messages: list[dict] = []
-        self._thinking_dots = 0
-        self._thinking_timer: Timer | None = None
-        self._start_time = 0.0
-        self._total_tokens = 0
-        self._context_used = 0
-        self._context_max = 0
         self._show_full_thinking = False
         self._input_history: list[str] = []
         self._history_index = 0
@@ -115,46 +45,7 @@ class TitanApp(App):
         yield chat_log
         with Vertical(id="bottom-area"):
             yield Input(placeholder="Ask Titan anything...", id="input-box")
-            with Horizontal(id="status-bar"):
-                yield Static("Titan", id="status-left")
-                yield Static("/help", id="status-right")
-
-    def _start_thinking(self) -> None:
-        self._thinking_dots = 0
-        self._start_time = time.monotonic()
-        self._total_tokens = 0
-        self._thinking_timer = self.set_interval(0.4, self._animate_thinking)
-        self.query_one("#status-right", Static).update("Press ESC to interrupt")
-
-    def _stop_thinking(self) -> None:
-        if self._thinking_timer is not None:
-            self._thinking_timer.stop()
-            self._thinking_timer = None
-        elapsed = time.monotonic() - self._start_time
-        self.query_one("#status-left", Static).update(self._format_status(elapsed))
-        self.query_one("#status-right", Static).update("/help")
-
-    def _animate_thinking(self) -> None:
-        self._thinking_dots = (self._thinking_dots % 3) + 1
-        dots = "." * self._thinking_dots
-        elapsed = time.monotonic() - self._start_time
-        self.query_one("#status-left", Static).update(
-            self._format_status(elapsed, f"Thinking{dots}")
-        )
-
-    def _format_status(self, elapsed: float, suffix: str = "") -> str:
-        h, remainder = divmod(int(elapsed), 3600)
-        m, s = divmod(remainder, 60)
-        time_str = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m}:{s:02d}"
-        parts = ["Titan", time_str]
-        if self._total_tokens > 0:
-            parts.append(f"{self._total_tokens:,} tokens")
-        if self._context_max > 0 and self._context_used > 0:
-            pct = int(self._context_used / self._context_max * 100)
-            parts.append(f"{pct}% ctx")
-        if suffix:
-            parts.append(suffix)
-        return "  ".join(parts)
+            yield StatusBar()
 
     def _is_agent_running(self) -> bool:
         return any(w.name == "_run_agent" and w.is_running for w in self.workers)
@@ -163,7 +54,7 @@ class TitanApp(App):
         for worker in self.workers:
             if worker.name == "_run_agent" and worker.is_running:
                 worker.cancel()
-        self._stop_thinking()
+        self.query_one(StatusBar).stop_thinking()
         log = self.query_one("#chat-log", RichLog)
         log.write("[dim]Interrupted.[/dim]")
         log.write("")
@@ -278,7 +169,7 @@ class TitanApp(App):
             return
 
         # Run agent in background thread so UI doesn't freeze
-        self._start_thinking()
+        self.query_one(StatusBar).start_thinking()
         self._run_agent(user_input, log)
 
     def _handle_command(self, user_input: str, log: RichLog) -> None:
@@ -391,7 +282,12 @@ class TitanApp(App):
             log.write(f"[red]Agent error: {e}[/red]")
 
         finally:
-            self._stop_thinking()
+            self.query_one(StatusBar).stop_thinking()
+
+        # # When SessionStats updates land (see Status Bar Session Stats Fix Plan):
+        # bar = self.query_one(StatusBar)
+        # bar.last_prompt_tokens = usage["prompt_tokens"]
+        # bar.total_tokens += usage["completion_tokens"]
 
 
 def run(working_dir: str = "."):
