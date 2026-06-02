@@ -20,7 +20,7 @@ def main(
     working_dir: str = typer.Option(".", help="Working directory for the agent"),
 ):
     """Titan — Local Coding Assistant"""
-    from titan.tui import run
+    from titan.tui.app import run
 
     run(working_dir=working_dir)
 
