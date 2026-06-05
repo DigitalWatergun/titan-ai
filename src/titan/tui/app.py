@@ -14,6 +14,7 @@ from textual.widgets import Input, RichLog
 from titan.agents import MAIN_AGENT
 from titan.loop import run_turn
 from titan.rag.indexer import index_codebase
+from titan.tui.commands import COMMANDS, CommandContext
 from titan.tui.widgets.status_bar import StatusBar
 
 
@@ -173,38 +174,13 @@ class TitanApp(App):
         self._run_agent(user_input, log)
 
     def _handle_command(self, user_input: str, log: RichLog) -> None:
-        command = user_input.strip().lower()
-
-        if command == "/quit":
-            self.exit()
-        elif command == "/clear":
-            self.messages = []
-            log.clear()
-            log.write("[dim]Conversation cleared.[/dim]")
-        elif command == "/help":
-            log.write("\n[bold]Available commands:[/bold]")
-            log.write("  [dim]/clear   — clear conversation[/dim]")
-            log.write(
-                "  [dim]/index   — index current directory (or /index <path>)[/dim]"
-            )
-            log.write("  [dim]/help    — show this help[/dim]")
-            log.write("  [dim]/quit    — exit[/dim]")
-            log.write("")
-            log.write("[bold]Keyboard shortcuts:[/bold]")
-            log.write("  [dim]Esc      — interrupt current response[/dim]")
-            log.write("  [dim]Ctrl+O   — toggle full/summary thinking mode[/dim]")
-            log.write("  [dim]PageUp   — scroll up[/dim]")
-            log.write("  [dim]PageDn   — scroll down[/dim]")
-        elif command.startswith("/index"):
-            import os
-
-            parts = user_input.strip().split(maxsplit=1)
-            directory = parts[1] if len(parts) > 1 else "."
-            display_dir = os.path.abspath(directory) if directory == "." else directory
-            log.write(f"[dim]Indexing {display_dir}...[/dim]")
-            self._run_index(directory, display_dir, log)
+        name, _, args = user_input.strip().partition(" ")
+        name = name.lower()
+        handler = COMMANDS.get(name)
+        if handler:
+            handler(CommandContext(app=self, args=args, log=log))
         else:
-            log.write(f"[dim]Unknown command: {command}[/dim]")
+            log.write(f"[dim]Unknown command: {name}[/dim]")
 
     @work(thread=True)
     def _run_index(self, directory: str, display_dir: str, log: RichLog) -> None:
