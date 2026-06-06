@@ -29,6 +29,14 @@ async def _stream_and_collect(client: httpx.AsyncClient, payload: dict):
                 break
 
             chunk = json.loads(data)
+
+            if usage := chunk.get("usage"):
+                yield ("usage", usage)
+                continue
+
+            if not chunk.get("choices"):
+                continue
+
             choice = chunk["choices"][0]
             delta = choice.get("delta", {})
 
@@ -87,6 +95,7 @@ async def run_turn(agent: Agent, conversation: list[dict]):
                 "tools": agent.tool_schemas,
                 "temperature": 0,
                 "stream": True,
+                "stream_options": {"include_usage": True},
             }
 
             assistant_msg = None

@@ -24,3 +24,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/titan"]
+
+[dependency-groups]
+dev = [
+    "textual-dev>=1.8.0",
+]

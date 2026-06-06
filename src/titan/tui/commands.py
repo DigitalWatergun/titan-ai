@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Callable
 
 from textual.widgets import RichLog
 
+from titan.tui.widgets.status_bar import StatusBar
+
 # Need to write this here for type checking due to circular dependency. Not needed for runtime
 if TYPE_CHECKING:
     from titan.tui.app import TitanApp
@@ -39,6 +41,7 @@ def quit_app(ctx: CommandContext) -> None:
 @command("/clear")
 def clear_conversation(ctx: CommandContext) -> None:
     ctx.app.messages = []
+    ctx.app.query_one(StatusBar).reset_stats()
     ctx.log.clear()
     ctx.log.write("[dim]Conversation cleared.[/dim]")
 

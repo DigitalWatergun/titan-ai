@@ -31,7 +31,7 @@ class StatusBar(Horizontal):
     }
     """
 
-    total_tokens: reactive[int] = reactive(0)
+    total_completion_tokens: reactive[int] = reactive(0)
     last_prompt_tokens: reactive[int] = reactive(0)
     n_ctx: reactive[int] = reactive(0)
     thinking: reactive[bool] = reactive(False)
@@ -41,6 +41,7 @@ class StatusBar(Horizontal):
         self._timer: Timer | None = None
         self._start_time = 0.0
         self._dots = 0
+        self._live_tokens = 0
 
     def compose(self):
         yield Static("Titan", id="status-left")
@@ -49,13 +50,23 @@ class StatusBar(Horizontal):
     def start_thinking(self) -> None:
         self._start_time = time.monotonic()
         self._dots = 0
+        self._live_tokens = 0
         self.thinking = True
         self._timer = self.set_interval(0.4, self._tick_animation)
         self.query_one("#status-right", Static).update("Press ESC to interrupt")
 
+    def add_live_token(self, n: int = 1) -> None:
+        self._live_tokens += n
+        self._refresh_display()
+
+    def commit_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
+        self._live_tokens = 0
+        self.last_prompt_tokens = prompt_tokens
+        self.total_completion_tokens += completion_tokens
+
     def _tick_animation(self) -> None:
         self._dots = (self._dots % 3) + 1
-        self._refresh_display(f"Thinking{'.' * self._dots}")
+        self._refresh_display()
 
     def stop_thinking(self) -> None:
         if self._timer:
@@ -65,7 +76,12 @@ class StatusBar(Horizontal):
         self._refresh_display()
         self.query_one("#status-right", Static).update("/help")
 
-    def watch_total_tokens(self, *_):
+    def reset_stats(self) -> None:
+        self._live_tokens = 0
+        self.total_completion_tokens = 0
+        self.last_prompt_tokens = 0
+
+    def watch_total_completion_tokens(self, *_):
         self._refresh_display()
 
     def watch_last_prompt_tokens(self, *_):
@@ -74,17 +90,18 @@ class StatusBar(Horizontal):
     def watch_n_ctx(self, *_):
         self._refresh_display()
 
-    def _refresh_display(self, suffix: str = "") -> None:
+    def _refresh_display(self) -> None:
         elapsed = time.monotonic() - self._start_time if self.thinking else 0
         h, remainder = divmod(int(elapsed), 3600)
         m, s = divmod(remainder, 60)
         time_str = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m}:{s:02d}"
         parts = ["Titan", time_str]
-        if self.total_tokens > 0:
-            parts.append(f"{self.total_tokens:,} tokens")
+        shown_tokens = self.total_completion_tokens + self._live_tokens
+        if shown_tokens > 0:
+            parts.append(f"{shown_tokens:,} tokens")
         if self.n_ctx > 0 and self.last_prompt_tokens > 0:
             pct = int(self.last_prompt_tokens / self.n_ctx * 100)
             parts.append(f"{pct}% ctx")
-        if suffix:
-            parts.append(suffix)
+        if self.thinking:
+            parts.append(f"Thinking{'.' * self._dots}")
         self.query_one("#status-left", Static).update("  ".join(parts))

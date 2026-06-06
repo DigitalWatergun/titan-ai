@@ -1,6 +1,7 @@
 import asyncio
 import os
 
+import httpx
 from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.panel import Panel
@@ -83,22 +84,18 @@ class TitanApp(App):
         self.query_one("#chat-log", RichLog).scroll_page_down()
 
     def _fetch_context_size(self) -> None:
-        import os
-
-        import httpx
-
         llm_url = os.getenv("TITAN_LLM_URL", "http://localhost:8001/v1")
         base_url = llm_url.removesuffix("/v1")
         try:
             resp = httpx.get(f"{base_url}/props", timeout=5)
             data = resp.json()
             settings = data.get("default_generation_settings", {})
-            self._context_max = settings.get("n_ctx", 0)
+            n_ctx = settings.get("n_ctx", 0)
         except Exception:
-            self._context_max = 0
+            n_ctx = 0
+        self.query_one(StatusBar).n_ctx = n_ctx
 
     def on_mount(self) -> None:
-
         os.chdir(self.working_dir)
         self._fetch_context_size()
 
@@ -226,10 +223,21 @@ class TitanApp(App):
                 log.write("")
                 token_buffer.clear()
 
+        bar = self.query_one(StatusBar)
+
         try:
             last_event_type = None
             async for event in run_turn(MAIN_AGENT, self.messages):
                 event_type = event[0]
+
+                if event_type == "usage":
+                    usage = event[1]
+                    bar.commit_usage(
+                        usage.get("prompt_tokens", 0),
+                        usage.get("completion_tokens", 0),
+                    )
+                    continue
+
                 if last_event_type and last_event_type != event_type:
                     flush_text()
                 last_event_type = event_type
@@ -237,8 +245,10 @@ class TitanApp(App):
                 match event:
                     case ("reasoning", text):
                         reasoning_buffer.append(text)
+                        bar.add_live_token()
                     case ("token", text):
                         token_buffer.append(text)
+                        bar.add_live_token()
                     case ("tool_call", name, args):
                         log.write(Text(f"→ {name}({args})", style="dim"))
                     case ("tool_result", name, result):
@@ -259,11 +269,6 @@ class TitanApp(App):
 
         finally:
             self.query_one(StatusBar).stop_thinking()
-
-        # # When SessionStats updates land (see Status Bar Session Stats Fix Plan):
-        # bar = self.query_one(StatusBar)
-        # bar.last_prompt_tokens = usage["prompt_tokens"]
-        # bar.total_tokens += usage["completion_tokens"]
 
 
 def run(working_dir: str = "."):
