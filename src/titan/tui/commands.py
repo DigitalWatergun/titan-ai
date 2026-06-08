@@ -40,7 +40,7 @@ def quit_app(ctx: CommandContext) -> None:
 
 @command("/clear")
 def clear_conversation(ctx: CommandContext) -> None:
-    ctx.app.messages = []
+    ctx.app._store.new()
     ctx.app.query_one(StatusBar).reset_stats()
     ctx.log.clear()
     ctx.log.write("[dim]Conversation cleared.[/dim]")

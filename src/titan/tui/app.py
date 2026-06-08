@@ -1,5 +1,6 @@
 import asyncio
 import os
+from pathlib import Path
 
 import httpx
 from rich.markdown import Markdown
@@ -13,10 +14,13 @@ from textual.events import Key
 from textual.widgets import Input, RichLog
 
 from titan.agents import MAIN_AGENT
+from titan.conversations.store import ConversationStore
 from titan.loop import run_turn
 from titan.rag.indexer import index_codebase
 from titan.tui.commands import COMMANDS, CommandContext
 from titan.tui.widgets.status_bar import StatusBar
+
+CONVERSATIONS_DIR = Path.home() / ".titan" / "conversations"
 
 
 class TitanApp(App):
@@ -35,11 +39,15 @@ class TitanApp(App):
     def __init__(self, working_dir: str = "."):
         super().__init__()
         self.working_dir = working_dir
-        self.messages: list[dict] = []
+        self._store = ConversationStore(CONVERSATIONS_DIR)
         self._show_full_thinking = False
         self._input_history: list[str] = []
         self._history_index = 0
         self._saved_input = ""
+
+    @property
+    def messages(self) -> list[dict]:
+        return self._store.messages
 
     def compose(self) -> ComposeResult:
         chat_log = RichLog(id="chat-log", wrap=True, highlight=False, markup=True)
@@ -153,13 +161,7 @@ class TitanApp(App):
         log = self.query_one("#chat-log", RichLog)
 
         # Display user message
-        log.write("")
-        user_msg = Text.assemble(
-            ("❯ ", "#4a90c2"),
-            (user_input, "#ffffff"),
-        )
-        log.write(Padding(user_msg, (0), style="on #2a2a2a"), expand=True)
-        log.write("")
+        self._write_user_message(user_input)
 
         # Handle slash commands
         if user_input.startswith("/"):
@@ -202,6 +204,52 @@ class TitanApp(App):
                 log.write, f"[dim]Full traceback written to {log_path}[/dim]"
             )
 
+    # --- rendering primitives (shared by live streaming + history replay) ---
+
+    def _write_user_message(self, content: str) -> None:
+        log = self.query_one("#chat-log", RichLog)
+        log.write("")
+        log.write(
+            Padding(
+                Text.assemble(("❯ ", "#4a90c2"), (content, "#ffffff")),
+                (0,),
+                style="on #2a2a2a",
+            ),
+            expand=True,
+        )
+        log.write("")
+
+    def _write_assistant_text(self, content: str) -> None:
+        log = self.query_one("#chat-log", RichLog)
+        log.write("")
+        log.write(Markdown(content))
+        log.write("")
+
+    def _write_tool_call(self, label: str) -> None:
+        self.query_one("#chat-log", RichLog).write(Text(f"→ {label}", style="dim"))
+
+    def _write_tool_result(self, label: str) -> None:
+        self.query_one("#chat-log", RichLog).write(Text(f"✓ {label}", style="dim"))
+
+    @staticmethod
+    def _snippet(text: str, limit: int = 80) -> str:
+        s = text.replace("\n", " ").strip()
+        return s[:limit] + "..." if len(s) > limit else s
+
+    def _render_conversation(self) -> None:
+        self.query_one("#chat-log", RichLog).clear()
+        for m in self.messages:
+            role, content = m["role"], m.get("content") or ""
+            if role == "user":
+                self._write_user_message(content)
+            elif role == "assistant" and content:
+                self._write_assistant_text(content)
+            elif role == "assistant" and m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    self._write_tool_call(f"{tc['function']['name']}(...)")
+            elif role == "tool":
+                self._write_tool_result(self._snippet(content))
+
     @work
     async def _run_agent(self, user_input: str, log: RichLog) -> None:
         self.messages.append({"role": "user", "content": user_input})
@@ -213,14 +261,10 @@ class TitanApp(App):
             """Render accumulated tokens as Markdown, then clear the buffer."""
             if reasoning_buffer:
                 text = "".join(reasoning_buffer)
-                thought = Text(f"💭 {text}", style="dim italic")
-                log.write(thought)
+                log.write(Text(f"💭 {text}", style="dim italic"))
                 reasoning_buffer.clear()
             if token_buffer:
-                text = "".join(token_buffer)
-                log.write("")
-                log.write(Markdown(text))
-                log.write("")
+                self._write_assistant_text("".join(token_buffer))
                 token_buffer.clear()
 
         bar = self.query_one(StatusBar)
@@ -250,12 +294,9 @@ class TitanApp(App):
                         token_buffer.append(text)
                         bar.add_live_token()
                     case ("tool_call", name, args):
-                        log.write(Text(f"→ {name}({args})", style="dim"))
+                        self._write_tool_call(f"{name}({args})")
                     case ("tool_result", name, result):
-                        snippet = result.replace("\n", " ").strip()
-                        if len(snippet) > 80:
-                            snippet = snippet[:80] + "..."
-                        log.write(Text(f"✓ {name} → {snippet}", style="dim"))
+                        self._write_tool_result(f"{name} → {self._snippet(result)}")
 
             # Loop exited cleanly — flush any final text
             flush_text()
@@ -269,6 +310,7 @@ class TitanApp(App):
 
         finally:
             self.query_one(StatusBar).stop_thinking()
+            self._store.save()
 
 
 def run(working_dir: str = "."):
