@@ -39,17 +39,17 @@ def quit_app(ctx: CommandContext) -> None:
 
 
 @command("/clear")
-def clear_conversation(ctx: CommandContext) -> None:
+def clear_chat(ctx: CommandContext) -> None:
     ctx.app._store.new()
     ctx.app.query_one(StatusBar).reset_stats()
     ctx.log.clear()
-    ctx.log.write("[dim]Conversation cleared.[/dim]")
+    ctx.log.write("[dim]Chat cleared.[/dim]")
 
 
 @command("/help")
 def show_help(ctx: CommandContext) -> None:
     ctx.log.write("\n[bold]Available commands:[/bold]")
-    ctx.log.write("  [dim]/clear   — clear conversation[/dim]")
+    ctx.log.write("  [dim]/clear   — clear chat[/dim]")
     ctx.log.write("  [dim]/index   — index current directory (or /index <path>)[/dim]")
     ctx.log.write("  [dim]/help    — show this help[/dim]")
     ctx.log.write("  [dim]/quit    — exit[/dim]")

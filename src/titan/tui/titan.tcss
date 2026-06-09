@@ -12,10 +12,17 @@ Screen {
     scrollbar-size: 0 0;
 }
 
-#bottom-area {
-    dock: bottom;
-    height: auto;
-    background: #1e1e1e;
+#body {
+    height: 1fr;        /* fills everything above the full-width status bar */
+}
+
+#main-area {
+    width: 1fr;         /* takes the space the sidebar doesn't */
+    height: 100%;
+}
+
+StatusBar {
+    dock: bottom;       /* full width, below the sidebar + main area */
 }
 
 #input-box {
@@ -35,3 +42,37 @@ Screen {
     border-left: tall #4a90c2;
 }
 
+
+#chat-sidebar {
+  width: 26;
+  height: 100%;
+  background: #1e1e1e;
+  border-right: solid #333333;
+  display: none; /* hidden until Ctrl+E */
+}
+
+#chat-sidebar-title {
+  height: 1;
+  padding: 0 1;
+  color: #4a90c2;
+  text-style: bold;
+  background: #1e1e1e;
+}
+
+#chat-list {
+  height: 1fr;
+  background: #1e1e1e;
+  scrollbar-size: 0 0;
+}
+
+#chat-list > ListItem {
+  padding: 0 1;
+  color: #cccccc;
+  background: #1e1e1e;
+}
+
+#chat-list > ListItem.-highlight,
+#chat-list:focus > ListItem.-highlight {
+  background: #2a2a2a;
+  color: #ffffff;
+}

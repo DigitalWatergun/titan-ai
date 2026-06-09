@@ -9,19 +9,21 @@ from rich.panel import Panel
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import Vertical
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
 from textual.events import Key
-from textual.widgets import Input, RichLog
+from textual.widgets import Input, ListView, RichLog
 
 from titan.agents import MAIN_AGENT
-from titan.conversations.store import ConversationStore
-from titan.conversations.titles import generate_title
+from titan.chats.store import ChatStore
+from titan.chats.titles import generate_title
 from titan.loop import run_turn
 from titan.rag.indexer import index_codebase
 from titan.tui.commands import COMMANDS, CommandContext
+from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.status_bar import StatusBar
 
-CONVERSATIONS_DIR = Path.home() / ".titan" / "conversations"
+CHATS_DIR = Path.home() / ".titan" / "chats"
 
 
 class TitanApp(App):
@@ -35,12 +37,13 @@ class TitanApp(App):
         ("pageup", "scroll_up"),
         ("pagedown", "scroll_down"),
         ("ctrl+o", "toggle_thinking"),
+        Binding("ctrl+e", "toggle_chat_sidebar", priority=True),
     ]
 
     def __init__(self, working_dir: str = "."):
         super().__init__()
         self.working_dir = working_dir
-        self._store = ConversationStore(CONVERSATIONS_DIR)
+        self._store = ChatStore(CHATS_DIR)
         self._show_full_thinking = False
         self._input_history: list[str] = []
         self._history_index = 0
@@ -51,12 +54,16 @@ class TitanApp(App):
         return self._store.messages
 
     def compose(self) -> ComposeResult:
-        chat_log = RichLog(id="chat-log", wrap=True, highlight=False, markup=True)
-        chat_log.can_focus = False
-        yield chat_log
-        with Vertical(id="bottom-area"):
-            yield Input(placeholder="Ask Titan anything...", id="input-box")
-            yield StatusBar()
+        with Horizontal(id="body"):
+            yield ChatSidebar(id="chat-sidebar")
+            with Vertical(id="main-area"):
+                chat_log = RichLog(
+                    id="chat-log", wrap=True, highlight=False, markup=True
+                )
+                chat_log.can_focus = False
+                yield chat_log
+                yield Input(placeholder="Ask Titan anything...", id="input-box")
+        yield StatusBar()
 
     def _is_agent_running(self) -> bool:
         return any(w.name == "_run_agent" and w.is_running for w in self.workers)
@@ -85,6 +92,15 @@ class TitanApp(App):
         mode = "full" if self._show_full_thinking else "summary"
         log = self.query_one("#chat-log", RichLog)
         log.write(f"[dim]Thinking mode: {mode} (Ctrl+O to toggle)[/dim]")
+
+    async def action_toggle_chat_sidebar(self) -> None:
+        chat_sidebar = self.query_one(ChatSidebar)
+        chat_sidebar.display = not chat_sidebar.display
+        if chat_sidebar.display:
+            await chat_sidebar.populate(self._store.list_chats(cwd=os.getcwd()))
+            chat_sidebar.query_one(ListView).focus()
+        else:
+            self.query_one("#input-box", Input).focus()
 
     def action_scroll_up(self) -> None:
         self.query_one("#chat-log", RichLog).scroll_page_up()
@@ -126,9 +142,12 @@ class TitanApp(App):
             )
         )
         log.write("")
+        self.query_one("#input-box", Input).focus()
 
     def on_key(self, event: Key) -> None:
         input_widget = self.query_one("#input-box", Input)
+        if not input_widget.has_focus:
+            return
         if event.key == "up":
             if self._input_history and self._history_index > 0:
                 if self._history_index == len(self._input_history):
@@ -172,6 +191,14 @@ class TitanApp(App):
         # Run agent in background thread so UI doesn't freeze
         self.query_one(StatusBar).start_thinking()
         self._run_agent(user_input, log)
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        item = event.item
+        if not isinstance(item, ChatItem):
+            return
+        self._store.load(item.chat_id)
+        self._render_chat()
+        self.query_one("#input-box", Input).focus()
 
     def _handle_command(self, user_input: str, log: RichLog) -> None:
         name, _, args = user_input.strip().partition(" ")
@@ -237,7 +264,7 @@ class TitanApp(App):
         s = text.replace("\n", " ").strip()
         return s[:limit] + "..." if len(s) > limit else s
 
-    def _render_conversation(self) -> None:
+    def _render_chat(self) -> None:
         self.query_one("#chat-log", RichLog).clear()
         for m in self.messages:
             role, content = m["role"], m.get("content") or ""
@@ -318,9 +345,9 @@ class TitanApp(App):
 
     @work
     async def _generate_title_bg(self) -> None:
-        conv_id = self._store._id
+        chat_id = self._store._id
         title = await generate_title(self.messages, MAIN_AGENT.model_name)
-        if self._store._id == conv_id:
+        if self._store._id == chat_id:
             self._store.set_title(title)
             self._store.save()
 

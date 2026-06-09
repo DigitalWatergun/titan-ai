@@ -7,14 +7,14 @@ from pathlib import Path
 
 
 @dataclass
-class ConversationMeta:
+class ChatMeta:
     id: str
     title: str
     updated_at: str
     cwd: str = ""
 
 
-class ConversationStore:
+class ChatStore:
     def __init__(self, base_dir: Path):
         self.base_dir = base_dir
         self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -36,7 +36,7 @@ class ConversationStore:
     def new(self) -> None:
         self._id = str(uuid.uuid4())
         self._title = ""
-        self._cwd = os.getcwd()  # the project this conversation belongs to
+        self._cwd = os.getcwd()  # the project this chat belongs to
         self._created_at = self._now()
         self.messages = []
 
@@ -60,18 +60,18 @@ class ConversationStore:
         )
         self._upsert_manifest(updated)
 
-    def load(self, conv_id: str) -> None:
-        data = json.loads((self.base_dir / f"{conv_id}.json").read_text())
+    def load(self, chat_id: str) -> None:
+        data = json.loads((self.base_dir / f"{chat_id}.json").read_text())
         self._id = data["id"]
         self._title = data["title"]
         self._cwd = data.get("cwd", "")
         self._created_at = data["created_at"]
         self.messages = data["messages"]
 
-    def list_conversations(self, cwd: str | None = None) -> list[ConversationMeta]:
+    def list_chats(self, cwd: str | None = None) -> list[ChatMeta]:
         manifest = self._read_manifest() or self._rebuild_manifest()
         metas = [
-            ConversationMeta(cid, m["title"], m["updated_at"], m.get("cwd", ""))
+            ChatMeta(cid, m["title"], m["updated_at"], m.get("cwd", ""))
             for cid, m in manifest.items()
             if cwd is None or m.get("cwd") == cwd
         ]
