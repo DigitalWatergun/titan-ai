@@ -130,3 +130,21 @@ async def run_turn(agent: Agent, conversation: list[dict]):
                         "content": str(result),
                     }
                 )
+
+
+async def complete_turn(
+    messages: list[dict], model: str, temperature: float = 0
+) -> str:
+    """One non-streaming chat completion → the assistant's text. No tools, no streaming."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{LLM_URL}/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "stream": False,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]

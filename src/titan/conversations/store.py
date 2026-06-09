@@ -29,6 +29,10 @@ class ConversationStore:
     def _manifest_path(self) -> Path:
         return self.base_dir / "index.json"
 
+    @property
+    def title(self) -> str:
+        return self._title
+
     def new(self) -> None:
         self._id = str(uuid.uuid4())
         self._title = ""
@@ -42,8 +46,6 @@ class ConversationStore:
     def save(self) -> None:
         if not self.messages:
             return
-        if not self._title:
-            self._title = self._derive_title(self.messages)
         updated = self._now()
         self._atomic_write(
             self.base_dir / f"{self._id}.json",
@@ -74,6 +76,9 @@ class ConversationStore:
             if cwd is None or m.get("cwd") == cwd
         ]
         return sorted(metas, key=lambda m: m.updated_at, reverse=True)
+
+    def set_title(self, title: str) -> None:
+        self._title = title
 
     def _rebuild_manifest(self) -> dict:
         manifest = {}
@@ -117,10 +122,3 @@ class ConversationStore:
     def _now(self) -> str:
         # ISO-8601 UTC. (Persistence legitimately needs real time; the agent loop doesn't.)
         return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-    def _derive_title(self, messages: list[dict], max_len: int = 50) -> str:
-        for m in messages:
-            if m["role"] == "user" and m.get("content"):
-                t = " ".join(m["content"].split())
-                return t[:max_len] + ("…" if len(t) > max_len else "")
-        return "Untitled"

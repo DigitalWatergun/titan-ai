@@ -15,6 +15,7 @@ from textual.widgets import Input, RichLog
 
 from titan.agents import MAIN_AGENT
 from titan.conversations.store import ConversationStore
+from titan.conversations.titles import generate_title
 from titan.loop import run_turn
 from titan.rag.indexer import index_codebase
 from titan.tui.commands import COMMANDS, CommandContext
@@ -301,6 +302,9 @@ class TitanApp(App):
             # Loop exited cleanly — flush any final text
             flush_text()
 
+            if not self._store.title:
+                self._generate_title_bg()
+
         except asyncio.CancelledError:
             # _cancel_agent already wrote "Interrupted" and stopped the spinner.
             raise
@@ -309,7 +313,15 @@ class TitanApp(App):
             log.write(f"[red]Agent error: {e}[/red]")
 
         finally:
+            self._store.save()
             self.query_one(StatusBar).stop_thinking()
+
+    @work
+    async def _generate_title_bg(self) -> None:
+        conv_id = self._store._id
+        title = await generate_title(self.messages, MAIN_AGENT.model_name)
+        if self._store._id == conv_id:
+            self._store.set_title(title)
             self._store.save()
 
 
