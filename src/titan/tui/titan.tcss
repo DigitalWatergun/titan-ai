@@ -42,7 +42,6 @@ StatusBar {
     border-left: tall #4a90c2;
 }
 
-
 #chat-sidebar {
   width: 26;
   height: 100%;

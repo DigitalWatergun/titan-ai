@@ -40,6 +40,7 @@ class StatusBar(Horizontal):
         super().__init__(**kwargs)
         self._timer: Timer | None = None
         self._start_time = 0.0
+        self._elapsed = 0.0
         self._dots = 0
         self._live_tokens = 0
 
@@ -49,6 +50,7 @@ class StatusBar(Horizontal):
 
     def start_thinking(self) -> None:
         self._start_time = time.monotonic()
+        self._elapsed = 0.0
         self._dots = 0
         self._live_tokens = 0
         self.thinking = True
@@ -72,6 +74,8 @@ class StatusBar(Horizontal):
         if self._timer:
             self._timer.stop()
             self._timer = None
+        if self.thinking:
+            self._elapsed = time.monotonic() - self._start_time
         self.thinking = False
         self._refresh_display()
         self.query_one("#status-right", Static).update("/help")
@@ -80,6 +84,8 @@ class StatusBar(Horizontal):
         self._live_tokens = 0
         self.total_completion_tokens = 0
         self.last_prompt_tokens = 0
+        self._elapsed = 0.0
+        self._refresh_display()
 
     def watch_total_completion_tokens(self, *_):
         self._refresh_display()
@@ -91,7 +97,7 @@ class StatusBar(Horizontal):
         self._refresh_display()
 
     def _refresh_display(self) -> None:
-        elapsed = time.monotonic() - self._start_time if self.thinking else 0
+        elapsed = (time.monotonic() - self._start_time) if self.thinking else self._elapsed
         h, remainder = divmod(int(elapsed), 3600)
         m, s = divmod(remainder, 60)
         time_str = f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m}:{s:02d}"

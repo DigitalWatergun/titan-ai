@@ -3,11 +3,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-import chromadb
 from chromadb.api.types import Embedding
 from sentence_transformers import SentenceTransformer
 
 from titan.rag.chunker import chunk_file, collect_files
+from titan.rag.store import client, codebase_collection_name
 
 
 def _patch_tqdm():
@@ -50,23 +50,23 @@ def create_embeddings():
 
 def index_codebase(
     directory_path: str,
-    collection_name: str = "codebase",
+    collection_name: str | None = None,
     on_progress: Callable[[str], None] | None = None,
 ) -> int:
     """Index a directory into ChromaDB. Returns number of chunks indexed."""
     directory = Path(directory_path).resolve()
-
-    # ChromaDB with persistent storage
-    client = chromadb.PersistentClient(path=str(directory / ".titan" / "chromadb"))
+    collection_name = collection_name or codebase_collection_name(directory)
+    vdb_client = client()
 
     # Delete existing collection if re-indexing
     try:
-        client.delete_collection(collection_name)
+        vdb_client.delete_collection(collection_name)
     except Exception:
         pass
 
-    collection = client.create_collection(
-        name=collection_name, metadata={"hnsw:space": "cosine"}
+    collection = vdb_client.create_collection(
+        name=collection_name,
+        metadata={"hnsw:space": "cosine", "project_path": str(directory)},
     )
 
     if on_progress:

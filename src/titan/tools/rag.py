@@ -1,7 +1,9 @@
-import chromadb
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 from titan.rag.indexer import create_embeddings
+from titan.rag.store import client, codebase_collection_name
 
 
 class SearchCodebaseInput(BaseModel):
@@ -13,10 +15,10 @@ class SearchCodebaseInput(BaseModel):
 
 def search_codebase(args: SearchCodebaseInput) -> str:
     try:
-        client = chromadb.PersistentClient(path=".titan/chromadb")
-        collection = client.get_collection("codebase")
+        vdb_client = client()
+        collection = vdb_client.get_collection(codebase_collection_name(Path.cwd()))
     except Exception:
-        return "Error: Codebase not indexed yet. Run 'titan index' first."
+        return "Error: this project isn't indexed yet. Run /index first."
 
     n_results = 5
 
