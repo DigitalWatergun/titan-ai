@@ -13,6 +13,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.events import Key
 from textual.widgets import Input, ListView, RichLog
+from textual.worker import get_current_worker
 
 from titan.agents import MAIN_AGENT
 from titan.chats.store import ChatStore
@@ -24,6 +25,10 @@ from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.status_bar import StatusBar
 
 CHATS_DIR = Path.home() / ".titan" / "chats"
+
+
+class _IndexCancelled(Exception):
+    pass
 
 
 class TitanApp(App):
@@ -68,6 +73,9 @@ class TitanApp(App):
     def _is_agent_running(self) -> bool:
         return any(w.name == "_run_agent" and w.is_running for w in self.workers)
 
+    def _is_index_running(self) -> bool:
+        return any(w.name == "_run_index" and w.is_running for w in self.workers)
+
     def _cancel_agent(self) -> None:
         for worker in self.workers:
             if worker.name == "_run_agent" and worker.is_running:
@@ -77,15 +85,26 @@ class TitanApp(App):
         log.write("[dim]Interrupted.[/dim]")
         log.write("")
 
+    def _cancel_index(self) -> None:
+        for worker in self.workers:
+            if worker.name == "_run_index" and worker.is_running:
+                worker.cancel()
+        self.query_one(StatusBar).stop_activity()
+        self.query_one("#chat-log", RichLog).write("[dim]Indexing interrupted.[/dim]")
+
     def action_safe_quit(self) -> None:
         if self._is_agent_running():
             self._cancel_agent()
+        elif self._is_index_running():
+            self._cancel_index()
         else:
             self.exit()
 
     def action_interrupt(self) -> None:
         if self._is_agent_running():
             self._cancel_agent()
+        elif self._is_index_running():
+            self._cancel_index()
 
     def action_toggle_thinking(self) -> None:
         self._show_full_thinking = not self._show_full_thinking
@@ -211,7 +230,13 @@ class TitanApp(App):
 
     @work(thread=True)
     def _run_index(self, directory: str, display_dir: str, log: RichLog) -> None:
+        worker = get_current_worker()
+        bar = self.query_one(StatusBar)
+        self.call_from_thread(bar.start_activity, "Indexing")
+
         def on_progress(msg: str) -> None:
+            if worker.is_cancelled:
+                raise _IndexCancelled
             self.call_from_thread(log.write, f"  [#4a90c2]→[/#4a90c2] [dim]{msg}[/dim]")
 
         try:
@@ -220,6 +245,8 @@ class TitanApp(App):
                 log.write,
                 f"[#4a90c2]Indexed {count} chunks from {display_dir}[/#4a90c2]",
             )
+        except _IndexCancelled:
+            pass
         except Exception as e:
             import traceback
             from pathlib import Path
@@ -231,6 +258,8 @@ class TitanApp(App):
             self.call_from_thread(
                 log.write, f"[dim]Full traceback written to {log_path}[/dim]"
             )
+        finally:
+            self.call_from_thread(bar.stop_activity)
 
     # --- rendering primitives (shared by live streaming + history replay) ---
 

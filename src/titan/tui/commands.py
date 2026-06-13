@@ -1,8 +1,10 @@
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 from textual.widgets import RichLog
 
+from titan.rag.store import client
 from titan.tui.widgets.status_bar import StatusBar
 
 # Need to write this here for type checking due to circular dependency. Not needed for runtime
@@ -49,21 +51,29 @@ def clear_chat(ctx: CommandContext) -> None:
 @command("/help")
 def show_help(ctx: CommandContext) -> None:
     ctx.log.write("\n[bold]Available commands:[/bold]")
-    ctx.log.write("  [dim]/clear   — clear chat[/dim]")
-    ctx.log.write("  [dim]/index   — index current directory (or /index <path>)[/dim]")
-    ctx.log.write("  [dim]/help    — show this help[/dim]")
-    ctx.log.write("  [dim]/quit    — exit[/dim]")
+    ctx.log.write("  [dim]/clear        — clear chat[/dim]")
+    ctx.log.write(
+        "  [dim]/index        — index current directory (or /index <path>)[/dim]"
+    )
+    ctx.log.write("  [dim]/index list   — show indexed projects[/dim]")
+    ctx.log.write("  [dim]/help         — show this help[/dim]")
+    ctx.log.write("  [dim]/quit         — exit[/dim]")
     ctx.log.write("")
     ctx.log.write("[bold]Keyboard shortcuts:[/bold]")
-    ctx.log.write("  [dim]Esc      — interrupt current response[/dim]")
-    ctx.log.write("  [dim]Ctrl+O   — toggle full/summary thinking mode[/dim]")
-    ctx.log.write("  [dim]PageUp   — scroll up[/dim]")
-    ctx.log.write("  [dim]PageDn   — scroll down[/dim]")
+    ctx.log.write("  [dim]Esc           — interrupt current response[/dim]")
+    ctx.log.write("  [dim]Ctrl+O        — toggle full/summary thinking mode[/dim]")
+    ctx.log.write("  [dim]Ctrl+E        — toggle recent chats[/dim]")
+    ctx.log.write("  [dim]PageUp        — scroll up[/dim]")
+    ctx.log.write("  [dim]PageDn        — scroll down[/dim]")
 
 
 @command("/index")
 def index_directory(ctx: CommandContext) -> None:
-    import os
+    if ctx.args.strip() == "list":
+        for c in client().list_collections():
+            m = c.metadata or {}
+            ctx.log.write(f"  {m.get('project_path', '?')} — {c.count()} chunks")
+        return
 
     directory = ctx.args.strip() or "."
     display_dir = os.path.abspath(directory) if directory == "." else directory
