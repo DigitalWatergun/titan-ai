@@ -82,7 +82,7 @@ def chunk_file(file_path: Path, max_chunk_lines: int = 60) -> list[CodeChunk]:
             chunk_content = "\n".join(lines[current_chunk_start:i])
             chunks.append(
                 CodeChunk(
-                    content=content,
+                    content=chunk_content,
                     file_path=str(file_path),
                     start_line=current_chunk_start + 1,
                     end_line=i,
