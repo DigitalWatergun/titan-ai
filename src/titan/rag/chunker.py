@@ -136,13 +136,23 @@ def _chunk_markdown(
     start = 0
 
     def context_prefix(idx: int) -> str:
-        trail: dict[int, str] = {}
+        stack: list[tuple[int, str]] = []
         for j in range(idx):
-            lvl = _heading_level(lines[j])
-            if lvl:
-                trail = {k: v for k, v in trail.items() if k < lvl}
-                trail[lvl] = lines[j].lstrip("# ").strip()
-        return " > ".join([file_path.stem] + [trail[k] for k in sorted(trail)])
+            level = _heading_level(lines[j])
+            if level == 0:
+                continue
+            while stack and stack[-1][0] >= level:
+                stack.pop()
+            stack.append((level, lines[j].lstrip("# ").strip()))
+
+        own_level = _heading_level(lines[idx]) if idx < len(lines) else 0
+        while own_level and stack and stack[-1][0] >= own_level:
+            stack.pop()
+
+        parts = [file_path.stem]
+        for _, text in stack:
+            parts.append(text)
+        return " > ".join(parts)
 
     def flush(end: int) -> None:
         body = "\n".join(lines[start:end]).strip()

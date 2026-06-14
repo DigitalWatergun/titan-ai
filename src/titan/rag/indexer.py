@@ -1,8 +1,12 @@
+import contextlib
+import io
 import os
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+import tqdm.std
 from chromadb.api.types import Embedding
 from sentence_transformers import SentenceTransformer
 
@@ -18,7 +22,6 @@ def _patch_tqdm():
     the file descriptors are in a state that causes this spawn to fail
     with 'bad value(s) in fds_to_keep' on macOS.
     """
-    import tqdm.std
 
     lock_class = getattr(tqdm.std, "TqdmDefaultWriteLock", None)
     if lock_class is not None:
@@ -29,9 +32,6 @@ def _patch_tqdm():
 
 def create_embeddings():
     """Create the embedding function."""
-    import contextlib
-    import io
-    import warnings
 
     os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
     _patch_tqdm()
