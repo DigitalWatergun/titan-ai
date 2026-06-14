@@ -56,12 +56,14 @@ def create_embeddings(device: str | None = None):
         contextlib.redirect_stdout(io.StringIO()),
     ):
         warnings.simplefilter("ignore")
-        _EMBEDDING_MODELS[resolved] = SentenceTransformer(
+        model = SentenceTransformer(
             "nomic-ai/nomic-embed-text-v1",
             trust_remote_code=True,
             device=resolved,
         )
-    return _EMBEDDING_MODELS[resolved]
+    model.max_seq_length = 1024
+    _EMBEDDING_MODELS[resolved] = model
+    return model
 
 
 def _empty_device_cache(device_type: str) -> None:
