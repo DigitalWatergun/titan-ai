@@ -48,7 +48,6 @@ def create_embeddings(device: str | None = None):
         return cached
 
     os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
-    os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.7")
     _patch_tqdm()
 
     with (
