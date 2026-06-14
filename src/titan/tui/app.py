@@ -19,7 +19,7 @@ from titan.agents import MAIN_AGENT
 from titan.chats.store import ChatStore
 from titan.chats.titles import generate_title
 from titan.loop import run_turn
-from titan.rag.indexer import index_projects
+from titan.rag.indexer import index_projects, index_vault
 from titan.tui.commands import COMMANDS, CommandContext
 from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.status_bar import StatusBar
@@ -229,7 +229,7 @@ class TitanApp(App):
             log.write(f"[dim]Unknown command: {name}[/dim]")
 
     @work(thread=True)
-    def _run_index(self, directory: str, log: RichLog) -> None:
+    def _run_index(self, directory: str, collection_type: str, log: RichLog) -> None:
         worker = get_current_worker()
         bar = self.query_one(StatusBar)
         self.call_from_thread(bar.start_activity, "Indexing")
@@ -240,7 +240,10 @@ class TitanApp(App):
             self.call_from_thread(log.write, f"  [#4a90c2]→[/#4a90c2] [dim]{msg}[/dim]")
 
         try:
-            results = index_projects(directory, on_progress=on_progress)
+            if collection_type == "codebase":
+                results = index_projects(directory, on_progress=on_progress)
+            elif collection_type == "vault":
+                results = index_vault(directory, on_progress=on_progress)
             total = sum(results.values())
             for path, n in results.items():
                 self.call_from_thread(
@@ -249,7 +252,7 @@ class TitanApp(App):
                 )
             self.call_from_thread(
                 log.write,
-                f"[#4a90c2]Indexed {total} chunks across {len(results)} project(s)[/#4a90c2]",
+                f"[#4a90c2]Indexed {total} chunks across {len(results)} collection(s)[/#4a90c2]",
             )
         except _IndexCancelled:
             pass

@@ -181,14 +181,15 @@ def _chunk_markdown(
     return chunks
 
 
-def collect_files(directory: Path) -> list[Path]:
+def collect_files(directory: Path, suffixes: set[str] | None = None) -> list[Path]:
     """Recursively collect all indexable files."""
+    allowed = suffixes or set(LANG_MAP)
     try:
         files = []
         for path in directory.rglob("*"):
             if any(part in IGNORE_PATTERMS for part in path.parts):
                 continue
-            if path.is_file() and path.suffix in LANG_MAP:
+            if path.is_file() and path.suffix in allowed:
                 files.append(path)
         return files
     except Exception as e:

@@ -24,14 +24,31 @@ Tools available:
 - list_directory: List directory contents (always start with ".")
 - run_command: Run shell commands
 - search_codebase: Search the indexed codebase by meaning
+- search_vault: Search the indexed Obsidian vault (the user's own notes) by meaning
 - web_search: Search the web for current information
 
 Rules:
 - ALWAYS use tools instead of writing code snippets to read/write files
 - Always start by listing "." — never guess paths
 - Read existing code before modifying it
-- When researching, use web_search for current info and search_codebase for project-specific questions
 - Be concise and direct
+
+Choosing a retrieval tool:
+- web_search — your default for factual, current, or general questions, and the source of truth
+  for anything that changes over time (versions, APIs, events, facts).
+- search_vault — the user's own notes. Use it for:
+  - personal recall: "what did I decide about X?", "what are my notes on Y?" — the user's own
+    record is the answer.
+  - locating a note to update: when asked to record or update something (often right after a
+    web_search for the current facts), search the vault first to find the existing note and edit
+    it in place instead of creating a duplicate.
+  Treat notes as possibly outdated — don't rely on them for external facts. When you use a note,
+  attribute it ("your note on X says…") and verify against the web if it's time-sensitive.
+- search_codebase — semantic search over the current project's indexed code. Use it to find
+  where something lives or how it works when you don't already know the file ("where is X
+  handled?", "how does the indexing flow work?"). If you already know the exact symbol or string,
+  grep with run_command instead; to open a known file, use read_file. Requires the project to be
+  indexed first (/index).
 """
 
 MAIN_AGENT = Agent(

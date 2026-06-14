@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from textual.widgets import RichLog
@@ -82,6 +83,12 @@ def index_directory(ctx: CommandContext) -> None:
             ctx.log.write(f"  {m.get('project_path', '?')} — {c.count()} chunks")
         return
 
+    if verb == "vault":
+        directory = Path(os.environ["OBSIDIAN_VAULT_DIR"]).expanduser().resolve()
+        ctx.log.write(f"[dim]Indexing {directory}...[/dim]")
+        ctx.app._run_index(directory, "vault", ctx.log)
+        return
+
     if verb in ("delete", "rm"):
         target = parts[1].strip() if len(parts) > 1 else os.getcwd()
         c = client()
@@ -116,4 +123,4 @@ def index_directory(ctx: CommandContext) -> None:
     directory = arg or "."
     display_dir = os.path.abspath(directory) if directory == "." else directory
     ctx.log.write(f"[dim]Indexing {display_dir}...[/dim]")
-    ctx.app._run_index(directory, ctx.log)
+    ctx.app._run_index(directory, "codebase", ctx.log)

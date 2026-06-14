@@ -16,7 +16,6 @@ from titan.rag.store import client, codebase_collection_name, find_projects
 
 def _patch_tqdm():
     """Prevent tqdm from creating multiprocessing locks.
-
     tqdm's __new__ always calls create_mp_lock() even when disabled,
     which spawns a resource tracker subprocess. Inside Textual's TUI,
     the file descriptors are in a state that causes this spawn to fail
@@ -48,14 +47,14 @@ def create_embeddings():
     return model
 
 
-def index_codebase(
+def _index_directory(
     directory_path: str,
-    collection_name: str | None = None,
+    collection_name: str,
     on_progress: Callable[[str], None] | None = None,
+    suffixes: set[str] | None = None,
 ) -> int:
-    """Index a directory into ChromaDB. Returns number of chunks indexed."""
+    """Index a directory into a named ChromaDB collection. Returns number of chunks indexed."""
     directory = Path(directory_path).resolve()
-    collection_name = collection_name or codebase_collection_name(directory)
     vdb_client = client()
 
     # Delete existing collection if re-indexing
@@ -73,7 +72,7 @@ def index_codebase(
         on_progress("Loading embedding model...")
 
     embeddings = create_embeddings()
-    files = collect_files(directory)
+    files = collect_files(directory, suffixes)
     total_files = len(files)
 
     if on_progress:
@@ -125,5 +124,20 @@ def index_projects(root: str, on_progress=None) -> dict[str, int]:
     for project in find_projects(Path(root)):
         if on_progress:
             on_progress(f"Indexing {project.name}...")
-        results[str(project)] = index_codebase(str(project), on_progress=on_progress)
+        results[str(project)] = _index_directory(
+            str(project),
+            collection_name=codebase_collection_name(project),
+            on_progress=on_progress,
+        )
+    return results
+
+
+def index_vault(vault_dir, on_progress=None) -> dict[str, int]:
+    results = {}
+    results["vault"] = _index_directory(
+        str(vault_dir),
+        collection_name="vault",
+        on_progress=on_progress,
+        suffixes={".md"},
+    )
     return results

@@ -8,7 +8,12 @@ from titan.tools.filesystem import (
     read_file,
     write_file,
 )
-from titan.tools.rag import SearchCodebaseInput, search_codebase
+from titan.tools.rag import (
+    SearchCodebaseInput,
+    SearchVaultInput,
+    search_codebase,
+    search_vault,
+)
 from titan.tools.search import WebSearchInput, web_search
 from titan.tools.shell import RunCommandInput, run_command
 
@@ -36,6 +41,7 @@ TOOL_FUNCS = {
     "write_file": write_file,
     "list_directory": list_directory,
     "search_codebase": search_codebase,
+    "search_vault": search_vault,
     "web_search": web_search,
     "run_command": run_command,
 }
@@ -45,6 +51,7 @@ TOOL_INPUT_MODELS: dict[str, type[BaseModel]] = {
     "write_file": WriteFileInput,
     "list_directory": ListDirectoryInput,
     "search_codebase": SearchCodebaseInput,
+    "search_vault": SearchVaultInput,
     "web_search": WebSearchInput,
     "run_command": RunCommandInput,
 }
