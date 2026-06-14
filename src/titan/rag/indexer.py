@@ -30,7 +30,7 @@ def _patch_tqdm():
         )
 
 
-_EMBEDDING_MODEL: SentenceTransformer | None = None
+_EMBEDDING_MODELS: dict[str, SentenceTransformer] = {}
 
 
 def _embedding_device() -> str:
@@ -41,12 +41,14 @@ def _embedding_device() -> str:
     return "cpu"
 
 
-def create_embeddings():
-    global _EMBEDDING_MODEL
-    if _EMBEDDING_MODEL is not None:
-        return _EMBEDDING_MODEL
+def create_embeddings(device: str | None = None):
+    resolved = device or _embedding_device()
+    cached = _EMBEDDING_MODELS.get(resolved)
+    if cached is not None:
+        return cached
 
     os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+    os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.7")
     _patch_tqdm()
 
     with (
@@ -55,12 +57,19 @@ def create_embeddings():
         contextlib.redirect_stdout(io.StringIO()),
     ):
         warnings.simplefilter("ignore")
-        _EMBEDDING_MODEL = SentenceTransformer(
+        _EMBEDDING_MODELS[resolved] = SentenceTransformer(
             "nomic-ai/nomic-embed-text-v1",
             trust_remote_code=True,
-            device=_embedding_device(),
+            device=resolved,
         )
-    return _EMBEDDING_MODEL
+    return _EMBEDDING_MODELS[resolved]
+
+
+def _empty_device_cache(device_type: str) -> None:
+    if device_type == "mps":
+        torch.mps.empty_cache()
+    elif device_type == "cuda":
+        torch.cuda.empty_cache()
 
 
 def _index_directory(
@@ -131,13 +140,20 @@ def _index_directory(
                 for c in batch
             ],
         )
+        _empty_device_cache(embeddings.device.type)
 
     return len(all_chunks)
 
 
 def index_projects(root: str, on_progress=None) -> dict[str, int]:
     results = {}
+    vault_dir = os.environ.get("OBSIDIAN_VAULT_DIR")
+    vault_resolved = Path(vault_dir).expanduser().resolve() if vault_dir else None
     for project in find_projects(Path(root)):
+        if vault_resolved and project.resolve() == vault_resolved:
+            if on_progress:
+                on_progress(f"Skipping vault (use /index vault): {project.name}")
+            continue
         if on_progress:
             on_progress(f"Indexing {project.name}...")
         results[str(project)] = _index_directory(

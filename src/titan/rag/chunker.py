@@ -45,6 +45,14 @@ IGNORE_PATTERMS = {
     ".mypy_cache",
 }
 
+MAX_FILE_BYTES = 1_000_000
+
+SKIP_FILENAMES = {
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "npm-shrinkwrap.json",
+}
+
 
 def chunk_file(file_path: Path, max_chunk_lines: int = 60) -> list[CodeChunk]:
     """Split a file into chunks. Markdown splits on headings; code on def/class boundaries."""
@@ -189,8 +197,14 @@ def collect_files(directory: Path, suffixes: set[str] | None = None) -> list[Pat
         for path in directory.rglob("*"):
             if any(part in IGNORE_PATTERMS for part in path.parts):
                 continue
-            if path.is_file() and path.suffix in allowed:
-                files.append(path)
+            if not path.is_file() or path.suffix not in allowed:
+                continue
+            if path.name in SKIP_FILENAMES:
+                continue
+            if path.stat().st_size > MAX_FILE_BYTES:
+                logger.info(f"Skipping large file: {path}")
+                continue
+            files.append(path)
         return files
     except Exception as e:
         logger.exception(f"Error finding files in directory {directory}: {e}")
