@@ -34,6 +34,7 @@ LANG_MAP = {
 IGNORE_PATTERMS = {
     "__pycache__",
     ".git",
+    ".obsidian",
     "node_modules",
     ".venv",
     "venv",
@@ -46,15 +47,23 @@ IGNORE_PATTERMS = {
 
 
 def chunk_file(file_path: Path, max_chunk_lines: int = 60) -> list[CodeChunk]:
-    """Split a file into chunks, trying to break on function/class boundaries"""
+    """Split a file into chunks. Markdown splits on headings; code on def/class boundaries."""
     try:
         content = file_path.read_text(encoding="utf-8", errors="ignore")
     except Exception as e:
         logger.exception(f"Failed to chunk file {file_path}: {e}")
         return []
 
-    suffix = file_path.suffix
-    language = LANG_MAP.get(suffix, "text")
+    language = LANG_MAP.get(file_path.suffix, "text")
+    if language == "markdown":
+        return _chunk_markdown(content, file_path, language, max_chunk_lines)
+    return _chunk_code(content, file_path, language, max_chunk_lines)
+
+
+def _chunk_code(
+    content: str, file_path: Path, language: str, max_chunk_lines: int
+) -> list[CodeChunk]:
+    """Split code on top-level definition boundaries (def, class, function, ...)."""
     lines = content.split("\n")
 
     if len(lines) <= max_chunk_lines:
@@ -68,7 +77,6 @@ def chunk_file(file_path: Path, max_chunk_lines: int = 60) -> list[CodeChunk]:
             )
         ]
 
-    # Split on top-level definitions (def, class, function, etc.)
     chunks = []
     current_chunk_start = 0
     boundary_keywords = ["def ", "class ", "async def ", "function ", "export "]
@@ -91,7 +99,6 @@ def chunk_file(file_path: Path, max_chunk_lines: int = 60) -> list[CodeChunk]:
             )
             current_chunk_start = i
 
-    # Don't forget the last chunk
     if current_chunk_start < len(lines):
         chunk_content = "\n".join(lines[current_chunk_start:])
         chunks.append(
@@ -103,6 +110,63 @@ def chunk_file(file_path: Path, max_chunk_lines: int = 60) -> list[CodeChunk]:
                 language=language,
             )
         )
+
+    return chunks
+
+
+def _heading_level(line: str) -> int:
+    """ATX heading level (1-6), or 0 if the line isn't a heading."""
+    s = line.lstrip()
+    hashes = len(s) - len(s.lstrip("#"))
+    if 1 <= hashes <= 6 and s[hashes : hashes + 1] == " ":
+        return hashes
+    return 0
+
+
+def _chunk_markdown(
+    content: str,
+    file_path: Path,
+    language: str,
+    max_chunk_lines: int,
+    min_chunk_lines: int = 8,
+) -> list[CodeChunk]:
+    """Split markdown on heading boundaries, prepending the filename + heading trail."""
+    lines = content.split("\n")
+    chunks: list[CodeChunk] = []
+    start = 0
+
+    def context_prefix(idx: int) -> str:
+        trail: dict[int, str] = {}
+        for j in range(idx):
+            lvl = _heading_level(lines[j])
+            if lvl:
+                trail = {k: v for k, v in trail.items() if k < lvl}
+                trail[lvl] = lines[j].lstrip("# ").strip()
+        return " > ".join([file_path.stem] + [trail[k] for k in sorted(trail)])
+
+    def flush(end: int) -> None:
+        body = "\n".join(lines[start:end]).strip()
+        if not body:
+            return
+        text = f"{context_prefix(start)}\n\n{body}"
+        chunks.append(
+            CodeChunk(
+                content=text,
+                file_path=str(file_path),
+                start_line=start + 1,
+                end_line=end,
+                language=language,
+            )
+        )
+
+    for i in range(1, len(lines)):
+        section_len = i - start
+        if (_heading_level(lines[i]) and section_len >= min_chunk_lines) or (
+            section_len >= max_chunk_lines
+        ):
+            flush(i)
+            start = i
+    flush(len(lines))
 
     return chunks
 

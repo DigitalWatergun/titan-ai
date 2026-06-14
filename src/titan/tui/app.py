@@ -19,7 +19,7 @@ from titan.agents import MAIN_AGENT
 from titan.chats.store import ChatStore
 from titan.chats.titles import generate_title
 from titan.loop import run_turn
-from titan.rag.indexer import index_codebase
+from titan.rag.indexer import index_projects
 from titan.tui.commands import COMMANDS, CommandContext
 from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.status_bar import StatusBar
@@ -229,7 +229,7 @@ class TitanApp(App):
             log.write(f"[dim]Unknown command: {name}[/dim]")
 
     @work(thread=True)
-    def _run_index(self, directory: str, display_dir: str, log: RichLog) -> None:
+    def _run_index(self, directory: str, log: RichLog) -> None:
         worker = get_current_worker()
         bar = self.query_one(StatusBar)
         self.call_from_thread(bar.start_activity, "Indexing")
@@ -240,16 +240,21 @@ class TitanApp(App):
             self.call_from_thread(log.write, f"  [#4a90c2]→[/#4a90c2] [dim]{msg}[/dim]")
 
         try:
-            count = index_codebase(directory, on_progress=on_progress)
+            results = index_projects(directory, on_progress=on_progress)
+            total = sum(results.values())
+            for path, n in results.items():
+                self.call_from_thread(
+                    log.write,
+                    f"  [#4a90c2]→[/#4a90c2] [dim]{n} chunks — {Path(path).name}[/dim]",
+                )
             self.call_from_thread(
                 log.write,
-                f"[#4a90c2]Indexed {count} chunks from {display_dir}[/#4a90c2]",
+                f"[#4a90c2]Indexed {total} chunks across {len(results)} project(s)[/#4a90c2]",
             )
         except _IndexCancelled:
             pass
         except Exception as e:
             import traceback
-            from pathlib import Path
 
             tb = traceback.format_exc()
             log_path = Path("/tmp/titan-error.log")

@@ -56,6 +56,9 @@ def show_help(ctx: CommandContext) -> None:
         "  [dim]/index        — index current directory (or /index <path>)[/dim]"
     )
     ctx.log.write("  [dim]/index list   — show indexed projects[/dim]")
+    ctx.log.write(
+        "  [dim]/index delete — remove an index (/index delete <name|all>)[/dim]"
+    )
     ctx.log.write("  [dim]/help         — show this help[/dim]")
     ctx.log.write("  [dim]/quit         — exit[/dim]")
     ctx.log.write("")
@@ -69,13 +72,48 @@ def show_help(ctx: CommandContext) -> None:
 
 @command("/index")
 def index_directory(ctx: CommandContext) -> None:
-    if ctx.args.strip() == "list":
+    arg = ctx.args.strip()
+    parts = arg.split(maxsplit=1)
+    verb = parts[0] if parts else ""
+
+    if verb == "list":
         for c in client().list_collections():
             m = c.metadata or {}
             ctx.log.write(f"  {m.get('project_path', '?')} — {c.count()} chunks")
         return
 
-    directory = ctx.args.strip() or "."
+    if verb in ("delete", "rm"):
+        target = parts[1].strip() if len(parts) > 1 else os.getcwd()
+        c = client()
+        cols = [
+            col for col in c.list_collections() if col.name.startswith("codebase__")
+        ]
+        if target == "all":
+            for col in cols:
+                c.delete_collection(col.name)
+            ctx.log.write(f"[dim]Deleted {len(cols)} index(es).[/dim]")
+            return
+        matches = [
+            col
+            for col in cols
+            if target in (col.metadata or {}).get("project_path", "")
+        ]
+        if not matches:
+            ctx.log.write(f"[dim]No index matching '{target}'.[/dim]")
+        elif len(matches) > 1:
+            ctx.log.write(
+                f"[dim]'{target}' matches {len(matches)} — be more specific:[/dim]"
+            )
+            for col in matches:
+                ctx.log.write(f"  {(col.metadata or {}).get('project_path', '?')}")
+        else:
+            c.delete_collection(matches[0].name)
+            ctx.log.write(
+                f"[dim]Deleted {(matches[0].metadata or {}).get('project_path', '?')}[/dim]"
+            )
+        return
+
+    directory = arg or "."
     display_dir = os.path.abspath(directory) if directory == "." else directory
     ctx.log.write(f"[dim]Indexing {display_dir}...[/dim]")
-    ctx.app._run_index(directory, display_dir, ctx.log)
+    ctx.app._run_index(directory, ctx.log)

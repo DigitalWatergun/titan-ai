@@ -7,7 +7,7 @@ from chromadb.api.types import Embedding
 from sentence_transformers import SentenceTransformer
 
 from titan.rag.chunker import chunk_file, collect_files
-from titan.rag.store import client, codebase_collection_name
+from titan.rag.store import client, codebase_collection_name, find_projects
 
 
 def _patch_tqdm():
@@ -118,3 +118,12 @@ def index_codebase(
         )
 
     return len(all_chunks)
+
+
+def index_projects(root: str, on_progress=None) -> dict[str, int]:
+    results = {}
+    for project in find_projects(Path(root)):
+        if on_progress:
+            on_progress(f"Indexing {project.name}...")
+        results[str(project)] = index_codebase(str(project), on_progress=on_progress)
+    return results
