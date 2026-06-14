@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+import torch
 import tqdm.std
 from chromadb.api.types import Embedding
 from sentence_transformers import SentenceTransformer
@@ -29,8 +30,21 @@ def _patch_tqdm():
         )
 
 
+_EMBEDDING_MODEL: SentenceTransformer | None = None
+
+
+def _embedding_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def create_embeddings():
-    """Create the embedding function."""
+    global _EMBEDDING_MODEL
+    if _EMBEDDING_MODEL is not None:
+        return _EMBEDDING_MODEL
 
     os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
     _patch_tqdm()
@@ -41,10 +55,12 @@ def create_embeddings():
         contextlib.redirect_stdout(io.StringIO()),
     ):
         warnings.simplefilter("ignore")
-        model = SentenceTransformer(
-            "nomic-ai/nomic-embed-text-v1", trust_remote_code=True, device="cpu"
+        _EMBEDDING_MODEL = SentenceTransformer(
+            "nomic-ai/nomic-embed-text-v1",
+            trust_remote_code=True,
+            device=_embedding_device(),
         )
-    return model
+    return _EMBEDDING_MODEL
 
 
 def _index_directory(
