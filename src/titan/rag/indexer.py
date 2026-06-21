@@ -12,7 +12,12 @@ from chromadb.api.types import Embedding
 from sentence_transformers import SentenceTransformer
 
 from titan.rag.chunker import chunk_file, collect_files
-from titan.rag.store import client, codebase_collection_name, find_projects
+from titan.rag.store import (
+    VAULT_COLLECTION,
+    client,
+    codebase_collection_name,
+    find_projects,
+)
 
 
 def _patch_tqdm():
@@ -166,11 +171,11 @@ def index_projects(root: str, on_progress=None) -> dict[str, int]:
 
 
 def index_vault(vault_dir, on_progress=None) -> dict[str, int]:
-    results = {}
-    results["vault"] = _index_directory(
-        str(vault_dir),
-        collection_name="vault",
-        on_progress=on_progress,
-        suffixes={".md"},
-    )
-    return results
+    return {
+        "vault": _index_directory(
+            str(vault_dir),
+            collection_name=VAULT_COLLECTION,
+            on_progress=on_progress,
+            suffixes={".md"},
+        )
+    }

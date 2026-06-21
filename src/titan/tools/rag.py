@@ -3,7 +3,11 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from titan.rag.indexer import create_embeddings
-from titan.rag.store import client
+from titan.rag.store import (
+    VAULT_COLLECTION,
+    client,
+    codebase_collections,
+)
 
 
 class SearchCodebaseInput(BaseModel):
@@ -31,12 +35,7 @@ class SearchVaultInput(BaseModel):
 
 
 def _resolve_collections(scope: str, cwd: Path) -> list | str:
-    vdb_client = client()
-    collections = [
-        col
-        for col in vdb_client.list_collections()
-        if col.name.startswith("codebase__")
-    ]
+    collections = codebase_collections()
 
     if scope == "all":
         return collections
@@ -134,7 +133,7 @@ def search_codebase(args: SearchCodebaseInput) -> str:
 def search_vault(args: SearchVaultInput) -> str:
     try:
         vdb_client = client()
-        collection = vdb_client.get_collection("vault")
+        collection = vdb_client.get_collection(VAULT_COLLECTION)
     except Exception:
         return "Error: Obsidian vault hasn't been indexed yet. Run /index vault first."
 
