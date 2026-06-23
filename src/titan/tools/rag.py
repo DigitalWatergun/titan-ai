@@ -1,10 +1,13 @@
 from pathlib import Path
 
+from chromadb.api.types import Where
 from pydantic import BaseModel, Field
 
+from titan.chats.rag import get_current_chat_id
 from titan.rag.indexer import create_embeddings
 from titan.rag.store import (
     VAULT_COLLECTION,
+    chats_collection,
     client,
     codebase_collections,
 )
@@ -32,6 +35,13 @@ class SearchVaultInput(BaseModel):
     """
 
     query: str = Field(description="Query string to find matching vault chunks")
+
+
+class SearchChatsInput(BaseModel):
+    """Search past chat history for things previously discussed or decided."""
+
+    query: str = Field(description="What to recall from past conversation")
+    this_chat_only: bool = Field(False, description="Limit to the current chat")
 
 
 def _resolve_collections(scope: str, cwd: Path) -> list | str:
@@ -165,3 +175,33 @@ def search_vault(args: SearchVaultInput) -> str:
         )
 
     return "\n".join(output) if output else "No relevant notes found."
+
+
+def search_chats(args: SearchChatsInput) -> str:
+    collection = chats_collection()
+    cid = get_current_chat_id()
+    where: Where | None = {"chat_id": cid} if (args.this_chat_only and cid) else None
+    query_vector = create_embeddings().encode(args.query).tolist()
+    results = collection.query(
+        query_embeddings=[query_vector],
+        n_results=5,
+        where=where,
+        include=["documents", "metadatas", "distances"],
+    )
+
+    if not results["documents"] or not results["metadatas"] or not results["distances"]:
+        return "No relevant chats found."
+
+    output = []
+    for doc, meta, dist in zip(
+        results["documents"][0],
+        results["metadatas"][0],
+        results["distances"][0],
+    ):
+        similarity = 1 - dist
+        output.append(
+            f"--- [{meta['title']}] turn {meta['turn_index']} "
+            f"[similarity: {similarity:.2f}] ---\n{doc}\n"
+        )
+
+    return "\n".join(output) if output else "No relevant chats found."

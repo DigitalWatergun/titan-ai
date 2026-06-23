@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable
 
 from textual.widgets import RichLog
 
+from titan.chats.rag import set_current_chat_id
 from titan.rag.store import client
 from titan.tui.widgets.status_bar import StatusBar
 
@@ -44,6 +45,7 @@ def quit_app(ctx: CommandContext) -> None:
 @command("/clear")
 def clear_chat(ctx: CommandContext) -> None:
     ctx.app._store.new()
+    set_current_chat_id(ctx.app._store.id)
     ctx.app.query_one(StatusBar).reset_stats()
     ctx.log.clear()
     ctx.log.write("[dim]Chat cleared.[/dim]")
@@ -120,6 +122,11 @@ def index_directory(ctx: CommandContext) -> None:
             ctx.log.write(
                 f"[dim]Deleted {(matches[0].metadata or {}).get('project_path', '?')}[/dim]"
             )
+        return
+
+    if verb == "chats":
+        ctx.log.write("[dim]Indexing chats...[/dim]")
+        ctx.app._run_index(str(ctx.app._store.base_dir), "chats", ctx.log)
         return
 
     directory = arg or "."
