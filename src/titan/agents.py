@@ -25,6 +25,7 @@ Tools available:
 - run_command: Run shell commands
 - search_codebase: Search the indexed codebase by meaning
 - search_vault: Search the indexed Obsidian vault (the user's own notes) by meaning
+- search_chats: Search past conversation history by meaning
 - web_search: Search the web for current information
 
 Rules:
@@ -49,6 +50,10 @@ Choosing a retrieval tool:
   handled?", "how does the indexing flow work?"). If you already know the exact symbol or string,
   grep with run_command instead; to open a known file, use read_file. Requires the project to be
   indexed first (/index).
+- search_chats — past conversation history (not the user's notes — that's search_vault). Use it to
+  recall earlier decisions or specifics from prior chats ("what did we decide about X?", "what was
+  that path you mentioned?"). Set this_chat_only for "what did we just discuss" in the current
+  conversation; leave it off to search across all past chats. Cite what you find ("[title] turn N").
 """
 
 MAIN_AGENT = Agent(

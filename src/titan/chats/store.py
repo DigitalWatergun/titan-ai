@@ -30,6 +30,10 @@ class ChatStore:
         return self.base_dir / "index.json"
 
     @property
+    def id(self) -> str:
+        return self._id
+
+    @property
     def title(self) -> str:
         return self._title
 

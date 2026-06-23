@@ -16,6 +16,7 @@ from textual.widgets import Input, ListView, RichLog
 from textual.worker import get_current_worker
 
 from titan.agents import MAIN_AGENT
+from titan.chats.rag import backfill_chats, set_current_chat_id
 from titan.chats.store import ChatStore
 from titan.chats.titles import generate_title
 from titan.loop import run_turn
@@ -49,6 +50,7 @@ class TitanApp(App):
         super().__init__()
         self.working_dir = working_dir
         self._store = ChatStore(CHATS_DIR)
+        set_current_chat_id(self._store.id)
         self._show_full_thinking = False
         self._input_history: list[str] = []
         self._history_index = 0
@@ -216,6 +218,7 @@ class TitanApp(App):
         if not isinstance(item, ChatItem):
             return
         self._store.load(item.chat_id)
+        set_current_chat_id(self._store.id)
         self._render_chat()
         self.query_one("#input-box", Input).focus()
 
@@ -244,6 +247,10 @@ class TitanApp(App):
                 results = index_projects(directory, on_progress=on_progress)
             elif collection_type == "vault":
                 results = index_vault(directory, on_progress=on_progress)
+            elif collection_type == "chats":
+                results = {
+                    "chats": backfill_chats(Path(directory), on_progress=on_progress)
+                }
             total = sum(results.values())
             for path, n in results.items():
                 self.call_from_thread(
@@ -382,9 +389,9 @@ class TitanApp(App):
 
     @work
     async def _generate_title_bg(self) -> None:
-        chat_id = self._store._id
+        chat_id = self._store.id
         title = await generate_title(self.messages, MAIN_AGENT.model_name)
-        if self._store._id == chat_id:
+        if self._store.id == chat_id:
             self._store.set_title(title)
             self._store.save()
 
