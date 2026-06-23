@@ -1,5 +1,5 @@
 Screen {
-    background: #1e1e1e;
+    background: #0d1117;
     padding: 1 2;
 }
 
@@ -7,8 +7,8 @@ Screen {
     height: 1fr;
     padding: 1 0;
     border: none;
-    background: #1e1e1e;
-    color: #ffffff;
+    background: #0d1117;
+    color: #c9d1d9;
     scrollbar-size: 0 0;
 }
 
@@ -26,12 +26,12 @@ StatusBar {
 }
 
 #input-box {
-    background: #2a2a2a;
+    background: #161b22;
     border-top: none;
     border-right: none;
     border-bottom: none;
-    border-left: tall #4a90c2;
-    color: #ffffff;
+    border-left: tall #58a6ff;
+    color: #c9d1d9;
     padding: 1 2;
 }
 
@@ -39,39 +39,39 @@ StatusBar {
     border-top: none;
     border-right: none;
     border-bottom: none;
-    border-left: tall #4a90c2;
+    border-left: tall #58a6ff;
 }
 
 #chat-sidebar {
   width: 26;
   height: 100%;
-  background: #1e1e1e;
-  border-right: solid #333333;
+  background: #0d1117;
+  border-right: solid #30363d;
   display: none; /* hidden until Ctrl+E */
 }
 
 #chat-sidebar-title {
   height: 1;
   padding: 0 1;
-  color: #4a90c2;
+  color: #58a6ff;
   text-style: bold;
-  background: #1e1e1e;
+  background: #0d1117;
 }
 
 #chat-list {
   height: 1fr;
-  background: #1e1e1e;
+  background: #0d1117;
   scrollbar-size: 0 0;
 }
 
 #chat-list > ListItem {
   padding: 0 1;
-  color: #cccccc;
-  background: #1e1e1e;
+  color: #c9d1d9;
+  background: #0d1117;
 }
 
 #chat-list > ListItem.-highlight,
 #chat-list:focus > ListItem.-highlight {
-  background: #2a2a2a;
-  color: #ffffff;
+  background: #30373d;
+  color: #c9d1d9;
 }

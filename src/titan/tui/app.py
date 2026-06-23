@@ -154,7 +154,7 @@ class TitanApp(App):
         log.write(
             Panel(
                 welcome,
-                border_style="#4a90c2",
+                border_style="#58a6ff",
                 title="Titan",
                 title_align="left",
                 padding=(1, 2),
@@ -237,7 +237,7 @@ class TitanApp(App):
         def on_progress(msg: str) -> None:
             if worker.is_cancelled:
                 raise _IndexCancelled
-            self.call_from_thread(log.write, f"  [#4a90c2]→[/#4a90c2] [dim]{msg}[/dim]")
+            self.call_from_thread(log.write, f"  [#58a6ff]→[/#58a6ff] [dim]{msg}[/dim]")
 
         try:
             if collection_type == "codebase":
@@ -248,11 +248,11 @@ class TitanApp(App):
             for path, n in results.items():
                 self.call_from_thread(
                     log.write,
-                    f"  [#4a90c2]→[/#4a90c2] [dim]{n} chunks — {Path(path).name}[/dim]",
+                    f"  [#58a6ff]→[/#58a6ff] [dim]{n} chunks — {Path(path).name}[/dim]",
                 )
             self.call_from_thread(
                 log.write,
-                f"[#4a90c2]Indexed {total} chunks across {len(results)} collection(s)[/#4a90c2]",
+                f"[#58a6ff]Indexed {total} chunks across {len(results)} collection(s)[/#58a6ff]",
             )
         except _IndexCancelled:
             pass
@@ -276,9 +276,9 @@ class TitanApp(App):
         log.write("")
         log.write(
             Padding(
-                Text.assemble(("❯ ", "#4a90c2"), (content, "#ffffff")),
+                Text.assemble(("❯ ", "#58a6ff"), (content, "#ffffff")),
                 (0,),
-                style="on #2a2a2a",
+                style="on #30363d",
             ),
             expand=True,
         )

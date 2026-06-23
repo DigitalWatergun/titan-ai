@@ -13,21 +13,21 @@ class StatusBar(Horizontal):
     StatusBar {
         height: 1;
         margin-top: 1;
-        background: #1e1e1e;
-        color: #666666;
+        background: #0d1117;
+        color: #30363d;
         padding: 0 1;
     }
     StatusBar > #status-left {
         width: 1fr;
         height: 1;
-        color: #4a90c2;
-        background: #1e1e1e;
+        color: #58a6ff;
+        background: #0d1117;
     }
     StatusBar > #status-right {
         width: auto;
         height: 1;
-        color: #666666;
-        background: #1e1e1e;
+        color: #30363d;
+        background: #0d1117;
     }
     """
 
