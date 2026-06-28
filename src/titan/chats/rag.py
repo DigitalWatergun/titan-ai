@@ -78,7 +78,7 @@ def index_chat(
     return len(docs)
 
 
-def backfill_chats(
+def index_all_chats(
     base_dir: Path,
     on_progress: Callable[[str], None] | None = None,
 ) -> int:

@@ -16,7 +16,7 @@ from textual.widgets import Input, ListView, RichLog
 from textual.worker import get_current_worker
 
 from titan.agents import MAIN_AGENT
-from titan.chats.rag import backfill_chats, set_current_chat_id
+from titan.chats.rag import index_all_chats, set_current_chat_id
 from titan.chats.store import ChatStore
 from titan.chats.titles import generate_title
 from titan.loop import run_turn
@@ -249,7 +249,7 @@ class TitanApp(App):
                 results = index_vault(directory, on_progress=on_progress)
             elif collection_type == "chats":
                 results = {
-                    "chats": backfill_chats(Path(directory), on_progress=on_progress)
+                    "chats": index_all_chats(Path(directory), on_progress=on_progress)
                 }
             total = sum(results.values())
             for path, n in results.items():
