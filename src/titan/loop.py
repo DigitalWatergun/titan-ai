@@ -133,10 +133,10 @@ async def run_turn(agent: Agent, conversation: list[dict]):
 
 
 async def complete_turn(
-    messages: list[dict], model: str, temperature: float = 0
+    messages: list[dict], model: str, temperature: float = 0, timeout: float = 60
 ) -> str:
     """One non-streaming chat completion → the assistant's text. No tools, no streaming."""
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(
             f"{LLM_URL}/chat/completions",
             json={
