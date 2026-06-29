@@ -5,6 +5,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+_SUMMARY_PREFIX = "[Summary of earlier conversation]\n"
+
 
 @dataclass
 class ChatMeta:
@@ -23,6 +25,7 @@ class ChatStore:
         self._cwd = ""
         self._created_at = ""
         self.messages: list[dict] = []
+        self._compaction: dict = {"summary": "", "covers_through": 0}
         self.new()
 
     @property
@@ -37,12 +40,21 @@ class ChatStore:
     def title(self) -> str:
         return self._title
 
+    @property
+    def cwd(self) -> str:
+        return self._cwd
+
+    @property
+    def compaction(self) -> dict:
+        return self._compaction
+
     def new(self) -> None:
         self._id = str(uuid.uuid4())
         self._title = ""
         self._cwd = os.getcwd()  # the project this chat belongs to
         self._created_at = self._now()
         self.messages = []
+        self._compaction = {"summary": "", "covers_through": 0}
 
     def add(self, message: dict) -> None:
         self.messages.append(message)
@@ -60,6 +72,7 @@ class ChatStore:
                 "created_at": self._created_at,
                 "updated_at": updated,
                 "messages": self.messages,
+                "compaction": self._compaction,
             },
         )
         self._upsert_manifest(updated)
@@ -71,6 +84,7 @@ class ChatStore:
         self._cwd = data.get("cwd", "")
         self._created_at = data["created_at"]
         self.messages = data["messages"]
+        self._compaction = data.get("compaction", {"summary": "", "covers_through": 0})
 
     def list_chats(self, cwd: str | None = None) -> list[ChatMeta]:
         manifest = self._read_manifest() or self._rebuild_manifest()
@@ -83,6 +97,17 @@ class ChatStore:
 
     def set_title(self, title: str) -> None:
         self._title = title
+
+    def set_compaction(self, summary: str, covers_through: int) -> None:
+        self._compaction = {"summary": summary, "covers_through": covers_through}
+
+    def working_context(self) -> list[dict]:
+        ctx_covers = self._compaction["covers_through"]
+        summary = self._compaction["summary"]
+        if not summary or ctx_covers <= 0:
+            return list(self.messages)
+        summary_msg = {"role": "user", "content": _SUMMARY_PREFIX + summary}
+        return [summary_msg] + self.messages[ctx_covers:]
 
     def _rebuild_manifest(self) -> dict:
         manifest = {}

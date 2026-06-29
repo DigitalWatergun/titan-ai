@@ -1,9 +1,6 @@
 from titan.loop import complete_turn
 
-_TITLE_SYSTEM = (
-    "Generate a concise 3-6 word title for this chat. "
-    "Reply with the title only — no quotes, no punctuation."
-)
+_TITLE_SYSTEM = "Generate a concise 3-6 word title for this chat. Reply with the title only — no quotes, no punctuation."
 
 
 async def generate_title(messages: list[dict], model: str) -> str:

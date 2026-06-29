@@ -16,16 +16,24 @@ from textual.widgets import Input, ListView, RichLog
 from textual.worker import get_current_worker
 
 from titan.agents import MAIN_AGENT
-from titan.chats.rag import index_all_chats, set_current_chat_id
+from titan.chats.compaction import compact
+from titan.chats.rag import (
+    count_turns,
+    index_all_chats,
+    index_chat,
+    set_current_chat_id,
+)
 from titan.chats.store import ChatStore
 from titan.chats.titles import generate_title
 from titan.loop import run_turn
 from titan.rag.indexer import index_projects, index_vault
 from titan.tui.commands import COMMANDS, CommandContext
 from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
+from titan.tui.widgets.compaction_progress import CompactionProgress
 from titan.tui.widgets.status_bar import StatusBar
 
 CHATS_DIR = Path.home() / ".titan" / "chats"
+COMPACT_THRESHOLD = 0.8
 
 
 class _IndexCancelled(Exception):
@@ -55,6 +63,7 @@ class TitanApp(App):
         self._input_history: list[str] = []
         self._history_index = 0
         self._saved_input = ""
+        self._compacting = False
 
     @property
     def messages(self) -> list[dict]:
@@ -69,6 +78,7 @@ class TitanApp(App):
                 )
                 chat_log.can_focus = False
                 yield chat_log
+                yield CompactionProgress()
                 yield Input(placeholder="Ask Titan anything...", id="input-box")
         yield StatusBar()
 
@@ -325,6 +335,8 @@ class TitanApp(App):
     @work
     async def _run_agent(self, user_input: str, log: RichLog) -> None:
         self.messages.append({"role": "user", "content": user_input})
+        working_context = self._store.working_context()
+        base_len = len(working_context)
 
         token_buffer: list[str] = []
         reasoning_buffer: list[str] = []
@@ -340,10 +352,11 @@ class TitanApp(App):
                 token_buffer.clear()
 
         bar = self.query_one(StatusBar)
+        synced = False
 
         try:
             last_event_type = None
-            async for event in run_turn(MAIN_AGENT, self.messages):
+            async for event in run_turn(MAIN_AGENT, working_context):
                 event_type = event[0]
 
                 if event_type == "usage":
@@ -371,10 +384,15 @@ class TitanApp(App):
                         self._write_tool_result(f"{name} → {self._snippet(result)}")
 
             # Loop exited cleanly — flush any final text
+            self.messages.extend(working_context[base_len:])
+            synced = True
             flush_text()
 
             if not self._store.title:
                 self._generate_title_bg()
+
+            if bar.n_ctx and bar.last_prompt_tokens / bar.n_ctx >= COMPACT_THRESHOLD:
+                await self._compact_chat()
 
         except asyncio.CancelledError:
             # _cancel_agent already wrote "Interrupted" and stopped the spinner.
@@ -384,6 +402,8 @@ class TitanApp(App):
             log.write(f"[red]Agent error: {e}[/red]")
 
         finally:
+            if not synced:
+                self.messages.extend(working_context[base_len:])
             self._store.save()
             self.query_one(StatusBar).stop_thinking()
 
@@ -394,6 +414,37 @@ class TitanApp(App):
         if self._store.id == chat_id:
             self._store.set_title(title)
             self._store.save()
+
+    async def _compact_chat(self) -> None:
+        if self._compacting:
+            return
+        self._compacting = True
+        progress_wgt = self.query_one(CompactionProgress)
+        input_wgt = self.query_one("#input-box", Input)
+        input_wgt.disabled = True
+        progress_wgt.start()
+        try:
+            result = await compact(self._store)
+            if result:
+                delta, new_cov, summary_text = result
+                old_cov = self._store.compaction["covers_through"]
+                turn_offset = count_turns(self._store.messages[:old_cov])
+                await asyncio.to_thread(
+                    index_chat,
+                    self._store.id,
+                    self._store.title,
+                    self._store.cwd,
+                    delta,
+                    turn_offset=turn_offset,
+                )
+                self._store.set_compaction(summary_text, new_cov)
+                self._store.save()
+        finally:
+            self._compacting = False
+            progress_wgt.stop()
+            input_wgt.disabled = False
+            input_wgt.focus()
+        self.query_one("#chat-log", RichLog).write("[dim]Chat compacted.[/dim]")
 
 
 def run(working_dir: str = "."):

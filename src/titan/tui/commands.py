@@ -140,3 +140,12 @@ def index_directory(ctx: CommandContext) -> None:
     display_dir = os.path.abspath(directory) if directory == "." else directory
     ctx.log.write(f"[dim]Indexing {display_dir}...[/dim]")
     ctx.app._run_index(directory, "codebase", ctx.log)
+
+
+@command("/compact")
+def compact_now(ctx: CommandContext) -> None:
+    if ctx.app._is_agent_running() or ctx.app._compacting:
+        ctx.log.write("[dim]Busy — try again in a moment.[/dim]")
+        return
+    ctx.app.run_worker(ctx.app._compact_chat())
+    ctx.log.write("[dim]Compacting chat...[/dim]")

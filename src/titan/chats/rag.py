@@ -44,15 +44,20 @@ def get_current_chat_id() -> str | None:
     return _current_chat_id
 
 
+def count_turns(messages: list[dict]) -> int:
+    return len(_segment_turns(messages))
+
+
 def index_chat(
     chat_id: str,
     title: str,
     cwd: str,
     messages: list[dict],
     updated_at: str = "",
+    turn_offset: int = 0,
 ) -> int:
     ids, docs, metas = [], [], []
-    for i_turn, turn in enumerate(_segment_turns(messages)):
+    for i_turn, turn in enumerate(_segment_turns(messages), start=turn_offset):
         text = f"user: {turn['user']}\nassistant: {turn['assistant']}"
         for i_piece, piece in enumerate(_split_if_oversized(text)):
             ids.append(f"{chat_id}__{i_turn}__{i_piece}")
