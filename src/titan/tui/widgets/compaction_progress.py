@@ -5,7 +5,13 @@ from textual.widgets import ProgressBar, Static
 
 
 class CompactionProgress(Horizontal):
-    DEFAULT_CSS = "CompactionProgress { display: none; height: 1; }"
+    DEFAULT_CSS = """
+    CompactionProgress { display: none; height: 1; margin: 1 0; }
+    CompactionProgress #compact-label { width: auto; padding-right: 2; color: #58a6ff; }
+    CompactionProgress ProgressBar { width: 1fr; }
+    CompactionProgress Bar { width: 1fr; }
+    CompactionProgress Bar > .bar--indeterminate { color: #58a6ff; }
+    """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
