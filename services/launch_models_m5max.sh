@@ -6,7 +6,7 @@ MODEL=$MODELS/Qwen3.6-27B-UD-Q4_K_XL.gguf
 
 $LLAMA_CPP \
   --model $MODEL \
-  --alias titan \
+  --alias qwen3.6-27b \
   --port 8001 \
   --host 0.0.0.0 \
   -ngl 99 \
