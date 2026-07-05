@@ -10,6 +10,7 @@ $LLAMA_CPP \
   --port 8001 \
   --host 0.0.0.0 \
   -ngl 99 \
+  --jinja \
   -fa on \
   -np 1 \
   --spec-type draft-mtp \
