@@ -48,6 +48,17 @@ def count_turns(messages: list[dict]) -> int:
     return len(_segment_turns(messages))
 
 
+def count_chat_pieces(base_dir: Path) -> int:
+    paths = [path for path in base_dir.glob("*.json") if path.name != "index.json"]
+    total = 0
+    for path in paths:
+        chat = json.loads(path.read_text())
+        for turn in _segment_turns(chat["messages"]):
+            text = f"user: {turn['user']}\nassistant: {turn['assistant']}"
+            total += len(_split_if_oversized(text))
+    return total
+
+
 def index_chat(
     chat_id: str,
     title: str,

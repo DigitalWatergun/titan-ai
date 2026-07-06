@@ -75,3 +75,33 @@ StatusBar {
   background: #30373d;
   color: #c9d1d9;
 }
+
+ConfirmScreen {
+    background: transparent;
+    padding: 0;
+}
+
+#confirm-bar {
+    background: #0d1117;
+    border-top: solid #58a6ff;
+    margin-bottom: 2;
+}
+
+#confirm-message {
+    color: #58a6ff;
+}
+
+ConfirmScreen OptionList,
+ConfirmScreen OptionList:focus {
+    background: transparent;
+    background-tint: transparent;
+    border: none;
+    color: #c9d1d9;
+}
+
+ConfirmScreen OptionList > .option-list--option-highlighted,
+ConfirmScreen OptionList:focus > .option-list--option-highlighted {
+    background: #30373d;
+    color: #c9d1d9;
+    text-style: bold;
+}

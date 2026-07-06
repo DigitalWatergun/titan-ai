@@ -18,6 +18,7 @@ from textual.worker import get_current_worker
 from titan.agents import MAIN_AGENT
 from titan.chats.compaction import compact
 from titan.chats.rag import (
+    count_chat_pieces,
     count_turns,
     index_all_chats,
     index_chat,
@@ -26,14 +27,24 @@ from titan.chats.rag import (
 from titan.chats.store import ChatStore
 from titan.chats.titles import generate_title
 from titan.loop import run_turn
-from titan.rag.indexer import index_projects, index_vault
+from titan.rag.indexer import (
+    collect_and_chunk,
+    embed_entries,
+)
 from titan.tui.commands import COMMANDS, CommandContext
+from titan.tui.screens.confirm_screen import request_approval
 from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.compaction_progress import CompactionProgress
 from titan.tui.widgets.status_bar import StatusBar
 
 CHATS_DIR = Path.home() / ".titan" / "chats"
 COMPACT_THRESHOLD = 0.8
+ESTIMATE_CONFIRM_CHUNKS = 10_000
+
+
+def _format_size(chunks: int) -> str:
+    kb = chunks * 5
+    return f"{kb} KB" if kb < 1024 else f"{kb / 1024:.1f} MB"
 
 
 class _IndexCancelled(Exception):
@@ -103,6 +114,28 @@ class TitanApp(App):
                 worker.cancel()
         self.query_one(StatusBar).stop_activity()
         self.query_one("#chat-log", RichLog).write("[dim]Indexing interrupted.[/dim]")
+
+    def _print_estimate(self, entries, log: RichLog) -> int:
+        total = sum(len(chunks) for _, _, chunks in entries)
+        for _, path, chunks in entries:
+            log.write(
+                f"  [#58a6ff]→[/#58a6ff] [dim]{len(chunks)} chunks — {Path(path).name}[/dim]"
+            )
+        log.write(f"[dim]Estimated ~{total} chunks, ~{_format_size(total)}[/dim]")
+        return total
+
+    async def _confirm_over_threshold(
+        self, total: int, unit: str, log: RichLog
+    ) -> bool:
+        # if total <= ESTIMATE_CONFIRM_CHUNKS:
+        #     return True
+        if (
+            await request_approval(self, f"Index ~{total} {unit} (~{_format_size(total)})?")
+            == "yes"
+        ):
+            return True
+        log.write("[dim]Cancelled - nothing embedded.[/dim]")
+        return False
 
     def action_safe_quit(self) -> None:
         if self._is_agent_running():
@@ -177,7 +210,7 @@ class TitanApp(App):
 
     def on_key(self, event: Key) -> None:
         input_widget = self.query_one("#input-box", Input)
-        if not input_widget.has_focus:
+        if self.focused is not input_widget:
             return
         if event.key == "up":
             if self._input_history and self._history_index > 0:
@@ -241,11 +274,12 @@ class TitanApp(App):
         else:
             log.write(f"[dim]Unknown command: {name}[/dim]")
 
-    @work(thread=True)
-    def _run_index(self, directory: str, collection_type: str, log: RichLog) -> None:
+    @work
+    async def _run_index(
+        self, directory: Path, collection_type: str, log: RichLog
+    ) -> None:
         worker = get_current_worker()
         bar = self.query_one(StatusBar)
-        self.call_from_thread(bar.start_activity, "Indexing")
 
         def on_progress(msg: str) -> None:
             if worker.is_cancelled:
@@ -253,23 +287,35 @@ class TitanApp(App):
             self.call_from_thread(log.write, f"  [#58a6ff]→[/#58a6ff] [dim]{msg}[/dim]")
 
         try:
-            if collection_type == "codebase":
-                results = index_projects(directory, on_progress=on_progress)
-            elif collection_type == "vault":
-                results = index_vault(directory, on_progress=on_progress)
-            elif collection_type == "chats":
-                results = {
-                    "chats": index_all_chats(Path(directory), on_progress=on_progress)
-                }
+            if collection_type == "chats":
+                base = directory
+                total = await asyncio.to_thread(count_chat_pieces, base)
+                log.write(
+                    f"[dim]Estimated ~{total} chat pieces, ~{_format_size(total)}[/dim]"
+                )
+                if not await self._confirm_over_threshold(total, "chat pieces", log):
+                    return
+                bar.start_activity("Indexing")
+                results = await asyncio.to_thread(
+                    lambda: {"chats": index_all_chats(base, on_progress)}
+                )
+            else:
+                entries = await asyncio.to_thread(
+                    collect_and_chunk, directory, collection_type, on_progress
+                )
+                total = self._print_estimate(entries, log)
+                if not await self._confirm_over_threshold(total, "chunks", log):
+                    return
+                bar.start_activity("Indexing")
+                results = await asyncio.to_thread(embed_entries, entries, on_progress)
+
             total = sum(results.values())
             for path, n in results.items():
-                self.call_from_thread(
-                    log.write,
-                    f"  [#58a6ff]→[/#58a6ff] [dim]{n} chunks — {Path(path).name}[/dim]",
+                log.write(
+                    f"  [#58a6ff]→[/#58a6ff] [dim]{n} chunks — {Path(path).name}[/dim]"
                 )
-            self.call_from_thread(
-                log.write,
-                f"[#58a6ff]Indexed {total} chunks across {len(results)} collection(s)[/#58a6ff]",
+            log.write(
+                f"[#58a6ff]Indexed {total} chunks across {len(results)} collection(s)[/#58a6ff]"
             )
         except _IndexCancelled:
             pass
@@ -279,12 +325,10 @@ class TitanApp(App):
             tb = traceback.format_exc()
             log_path = Path("/tmp/titan-error.log")
             log_path.write_text(tb)
-            self.call_from_thread(log.write, f"[red]Indexing failed: {e}[/red]")
-            self.call_from_thread(
-                log.write, f"[dim]Full traceback written to {log_path}[/dim]"
-            )
+            log.write(f"[red]Indexing failed: {e}[/red]")
+            log.write(f"[dim]Full traceback written to {log_path}[/dim]")
         finally:
-            self.call_from_thread(bar.stop_activity)
+            bar.stop_activity()
 
     # --- rendering primitives (shared by live streaming + history replay) ---
 

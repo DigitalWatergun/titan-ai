@@ -126,7 +126,7 @@ def index_directory(ctx: CommandContext) -> None:
 
     if verb == "chats":
         ctx.log.write("[dim]Indexing chats...[/dim]")
-        ctx.app._run_index(str(ctx.app._store.base_dir), "chats", ctx.log)
+        ctx.app._run_index(ctx.app._store.base_dir, "chats", ctx.log)
         return
 
     directory = arg or "."
@@ -134,12 +134,12 @@ def index_directory(ctx: CommandContext) -> None:
     here = Path(directory).expanduser().resolve()
     if vault_dir and here == Path(vault_dir).expanduser().resolve():
         ctx.log.write("[dim]Detected vault — indexing notes (.md only)...[/dim]")
-        ctx.app._run_index(directory, "vault", ctx.log)
+        ctx.app._run_index(here, "vault", ctx.log)
         return
 
     display_dir = os.path.abspath(directory) if directory == "." else directory
     ctx.log.write(f"[dim]Indexing {display_dir}...[/dim]")
-    ctx.app._run_index(directory, "codebase", ctx.log)
+    ctx.app._run_index(here, "codebase", ctx.log)
 
 
 @command("/compact")
