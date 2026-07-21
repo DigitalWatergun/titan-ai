@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "typer>=0.24.1",
     "textual>=8.2.4",
+    "trafilatura>=2.1.0",
 ]
 
 [project.scripts]

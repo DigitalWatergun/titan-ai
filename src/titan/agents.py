@@ -27,6 +27,7 @@ Tools available:
 - search_vault: Search the indexed Obsidian vault (the user's own notes) by meaning
 - search_chats: Search past conversation history by meaning
 - web_search: Search the web for current information
+- web_fetch: Fetch and read the full content of a web page (as markdown)
 
 Rules:
 - ALWAYS use tools instead of writing code snippets to read/write files
@@ -37,6 +38,10 @@ Rules:
 Choosing a retrieval tool:
 - web_search — your default for factual, current, or general questions, and the source of truth
   for anything that changes over time (versions, APIs, events, facts).
+- web_fetch - read the full page behind a URL. web_search returns only titles and short snippets; 
+  when a result looks relevant but its snippet doesn't contain the full answer, call web_fetch on 
+  that result's URL to read the actual page. Also use it when the user gives you a URL directly. 
+  Prefer fetching the one or two most relevant results over guessing from snippets. 
 - search_vault — the user's own notes. Use it for:
   - personal recall: "what did I decide about X?", "what are my notes on Y?" — the user's own
     record is the answer.

@@ -16,7 +16,7 @@ from titan.tools.rag import (
     search_codebase,
     search_vault,
 )
-from titan.tools.search import WebSearchInput, web_search
+from titan.tools.search import WebFetchInput, WebSearchInput, web_fetch, web_search
 from titan.tools.shell import RunCommandInput, run_command
 
 
@@ -46,6 +46,7 @@ TOOL_FUNCS = {
     "search_vault": search_vault,
     "search_chats": search_chats,
     "web_search": web_search,
+    "web_fetch": web_fetch,
     "run_command": run_command,
 }
 
@@ -57,6 +58,7 @@ TOOL_INPUT_MODELS: dict[str, type[BaseModel]] = {
     "search_vault": SearchVaultInput,
     "search_chats": SearchChatsInput,
     "web_search": WebSearchInput,
+    "web_fetch": WebFetchInput,
     "run_command": RunCommandInput,
 }
 
