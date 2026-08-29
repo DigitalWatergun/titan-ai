@@ -3,10 +3,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from textual.widgets import RichLog
-
 from titan.chats.rag import set_current_chat_id
 from titan.rag.store import client
+from titan.tui.widgets.chat_log import ChatLog
 from titan.tui.widgets.status_bar import StatusBar
 
 # Need to write this here for type checking due to circular dependency. Not needed for runtime
@@ -20,7 +19,7 @@ class CommandContext:
 
     app: "TitanApp"
     args: str
-    log: RichLog
+    log: ChatLog
 
 
 CommandHandler = Callable[["CommandContext"], None]
@@ -63,6 +62,9 @@ def show_help(ctx: CommandContext) -> None:
     ctx.log.write(
         "  [dim]/index delete — remove an index (/index delete <name|all>)[/dim]"
     )
+    ctx.log.write(
+        "  [dim]/copy         - enter copy mode (vim keys) to select/copy[/dim]"
+    )
     ctx.log.write("  [dim]/help         — show this help[/dim]")
     ctx.log.write("  [dim]/quit         — exit[/dim]")
     ctx.log.write("")
@@ -70,6 +72,9 @@ def show_help(ctx: CommandContext) -> None:
     ctx.log.write("  [dim]Esc           — interrupt current response[/dim]")
     ctx.log.write("  [dim]Ctrl+O        — toggle full/summary thinking mode[/dim]")
     ctx.log.write("  [dim]Ctrl+E        — toggle recent chats[/dim]")
+    ctx.log.write(
+        "  [dim]Ctrl+Y        - copy mode: hjkl move, v select, y yank, i/q exit[/dim]"
+    )
     ctx.log.write("  [dim]PageUp        — scroll up[/dim]")
     ctx.log.write("  [dim]PageDn        — scroll down[/dim]")
 
@@ -149,3 +154,8 @@ def compact_now(ctx: CommandContext) -> None:
         return
     ctx.app.run_worker(ctx.app._compact_chat())
     ctx.log.write("[dim]Compacting chat...[/dim]")
+
+
+@command("/copy")
+def copy_mode(ctx: CommandContext) -> None:
+    ctx.app.action_copy_mode()
