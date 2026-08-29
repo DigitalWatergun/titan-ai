@@ -2,7 +2,7 @@
 
 LLAMA_CPP=$HOME/code/llama.cpp/build/bin/llama-server
 MODELS=$HOME/models
-MODEL=$MODELS/Qwen3.6-27B-UD-Q4_K_XL.gguf
+MODEL=$MODELS/Qwen3.8-27B-UD-Q6_K_XL.gguf
 
 $LLAMA_CPP \
   --model $MODEL \
