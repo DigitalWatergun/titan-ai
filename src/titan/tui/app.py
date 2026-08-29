@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 import httpx
-from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.text import Text
@@ -12,7 +11,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.events import Key
-from textual.widgets import Input, ListView, RichLog
+from textual.widgets import Input, ListView
 from textual.worker import get_current_worker
 
 from titan.agents import MAIN_AGENT
@@ -33,6 +32,7 @@ from titan.rag.indexer import (
 )
 from titan.tui.commands import COMMANDS, CommandContext
 from titan.tui.screens.confirm_screen import request_approval
+from titan.tui.widgets.chat_log import ChatLog
 from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.compaction_progress import CompactionProgress
 from titan.tui.widgets.status_bar import StatusBar
@@ -62,6 +62,7 @@ class TitanApp(App):
         ("pageup", "scroll_up"),
         ("pagedown", "scroll_down"),
         ("ctrl+o", "toggle_thinking"),
+        ("ctrl+y", "copy_mode"),
         Binding("ctrl+e", "toggle_chat_sidebar", priority=True),
     ]
 
@@ -84,11 +85,7 @@ class TitanApp(App):
         with Horizontal(id="body"):
             yield ChatSidebar(id="chat-sidebar")
             with Vertical(id="main-area"):
-                chat_log = RichLog(
-                    id="chat-log", wrap=True, highlight=False, markup=True
-                )
-                chat_log.can_focus = False
-                yield chat_log
+                yield ChatLog(id="chat-log")
                 yield CompactionProgress()
                 yield Input(placeholder="Ask Titan anything...", id="input-box")
         yield StatusBar()
@@ -104,7 +101,7 @@ class TitanApp(App):
             if worker.name == "_run_agent" and worker.is_running:
                 worker.cancel()
         self.query_one(StatusBar).stop_thinking()
-        log = self.query_one("#chat-log", RichLog)
+        log = self.query_one("#chat-log", ChatLog)
         log.write("[dim]Interrupted.[/dim]")
         log.write("")
 
@@ -113,9 +110,9 @@ class TitanApp(App):
             if worker.name == "_run_index" and worker.is_running:
                 worker.cancel()
         self.query_one(StatusBar).stop_activity()
-        self.query_one("#chat-log", RichLog).write("[dim]Indexing interrupted.[/dim]")
+        self.query_one("#chat-log", ChatLog).write("[dim]Indexing interrupted.[/dim]")
 
-    def _print_estimate(self, entries, log: RichLog) -> int:
+    def _print_estimate(self, entries, log: ChatLog) -> int:
         total = sum(len(chunks) for _, _, chunks in entries)
         for _, path, chunks in entries:
             log.write(
@@ -125,12 +122,14 @@ class TitanApp(App):
         return total
 
     async def _confirm_over_threshold(
-        self, total: int, unit: str, log: RichLog
+        self, total: int, unit: str, log: ChatLog
     ) -> bool:
         # if total <= ESTIMATE_CONFIRM_CHUNKS:
         #     return True
         if (
-            await request_approval(self, f"Index ~{total} {unit} (~{_format_size(total)})?")
+            await request_approval(
+                self, f"Index ~{total} {unit} (~{_format_size(total)})?"
+            )
             == "yes"
         ):
             return True
@@ -154,7 +153,7 @@ class TitanApp(App):
     def action_toggle_thinking(self) -> None:
         self._show_full_thinking = not self._show_full_thinking
         mode = "full" if self._show_full_thinking else "summary"
-        log = self.query_one("#chat-log", RichLog)
+        log = self.query_one("#chat-log", ChatLog)
         log.write(f"[dim]Thinking mode: {mode} (Ctrl+O to toggle)[/dim]")
 
     async def action_toggle_chat_sidebar(self) -> None:
@@ -167,10 +166,13 @@ class TitanApp(App):
             self.query_one("#input-box", Input).focus()
 
     def action_scroll_up(self) -> None:
-        self.query_one("#chat-log", RichLog).scroll_page_up()
+        self.query_one("#chat-log", ChatLog).scroll_page_up()
 
     def action_scroll_down(self) -> None:
-        self.query_one("#chat-log", RichLog).scroll_page_down()
+        self.query_one("#chat-log", ChatLog).scroll_page_down()
+
+    def action_copy_mode(self) -> None:
+        self.query_one("#chat-log", ChatLog).enter_copy_mode()
 
     def _fetch_context_size(self) -> None:
         llm_url = os.getenv("TITAN_LLM_URL", "http://localhost:8001/v1")
@@ -188,7 +190,7 @@ class TitanApp(App):
         os.chdir(self.working_dir)
         self._fetch_context_size()
 
-        log = self.query_one("#chat-log", RichLog)
+        log = self.query_one("#chat-log", ChatLog)
 
         cwd = os.getcwd()
         welcome = Text.assemble(
@@ -242,7 +244,7 @@ class TitanApp(App):
         input_widget = self.query_one("#input-box", Input)
         input_widget.value = ""
 
-        log = self.query_one("#chat-log", RichLog)
+        log = self.query_one("#chat-log", ChatLog)
 
         # Display user message
         self._write_user_message(user_input)
@@ -265,7 +267,7 @@ class TitanApp(App):
         self._render_chat()
         self.query_one("#input-box", Input).focus()
 
-    def _handle_command(self, user_input: str, log: RichLog) -> None:
+    def _handle_command(self, user_input: str, log: ChatLog) -> None:
         name, _, args = user_input.strip().partition(" ")
         name = name.lower()
         handler = COMMANDS.get(name)
@@ -276,7 +278,7 @@ class TitanApp(App):
 
     @work
     async def _run_index(
-        self, directory: Path, collection_type: str, log: RichLog
+        self, directory: Path, collection_type: str, log: ChatLog
     ) -> None:
         worker = get_current_worker()
         bar = self.query_one(StatusBar)
@@ -333,7 +335,7 @@ class TitanApp(App):
     # --- rendering primitives (shared by live streaming + history replay) ---
 
     def _write_user_message(self, content: str) -> None:
-        log = self.query_one("#chat-log", RichLog)
+        log = self.query_one("#chat-log", ChatLog)
         log.write("")
         log.write(
             Padding(
@@ -341,21 +343,20 @@ class TitanApp(App):
                 (0,),
                 style="on #30363d",
             ),
-            expand=True,
         )
         log.write("")
 
     def _write_assistant_text(self, content: str) -> None:
-        log = self.query_one("#chat-log", RichLog)
+        log = self.query_one("#chat-log", ChatLog)
         log.write("")
-        log.write(Markdown(content))
+        log.write_markdown(content)
         log.write("")
 
     def _write_tool_call(self, label: str) -> None:
-        self.query_one("#chat-log", RichLog).write(Text(f"→ {label}", style="dim"))
+        self.query_one("#chat-log", ChatLog).write(Text(f"→ {label}", style="dim"))
 
     def _write_tool_result(self, label: str) -> None:
-        self.query_one("#chat-log", RichLog).write(Text(f"✓ {label}", style="dim"))
+        self.query_one("#chat-log", ChatLog).write(Text(f"✓ {label}", style="dim"))
 
     @staticmethod
     def _snippet(text: str, limit: int = 80) -> str:
@@ -363,7 +364,7 @@ class TitanApp(App):
         return s[:limit] + "..." if len(s) > limit else s
 
     def _render_chat(self) -> None:
-        self.query_one("#chat-log", RichLog).clear()
+        self.query_one("#chat-log", ChatLog).clear()
         for m in self.messages:
             role, content = m["role"], m.get("content") or ""
             if role == "user":
@@ -377,7 +378,7 @@ class TitanApp(App):
                 self._write_tool_result(self._snippet(content))
 
     @work
-    async def _run_agent(self, user_input: str, log: RichLog) -> None:
+    async def _run_agent(self, user_input: str, log: ChatLog) -> None:
         self.messages.append({"role": "user", "content": user_input})
         working_context = self._store.working_context()
         base_len = len(working_context)
@@ -488,7 +489,7 @@ class TitanApp(App):
             progress_wgt.stop()
             input_wgt.disabled = False
             input_wgt.focus()
-        self.query_one("#chat-log", RichLog).write("[dim]Chat compacted.[/dim]")
+        self.query_one("#chat-log", ChatLog).write("[dim]Chat compacted.[/dim]")
 
 
 def run(working_dir: str = "."):
