@@ -8,10 +8,9 @@ from rich.panel import Panel
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
-from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.events import Key
-from textual.widgets import Input, ListView
+from textual.widgets import Input
 from textual.worker import get_current_worker
 
 from titan.agents import MAIN_AGENT
@@ -31,9 +30,9 @@ from titan.rag.indexer import (
     embed_entries,
 )
 from titan.tui.commands import COMMANDS, CommandContext
+from titan.tui.screens.chat_picker_screen import ChatPickerScreen
 from titan.tui.screens.confirm_screen import request_approval
 from titan.tui.widgets.chat_log import ChatLog
-from titan.tui.widgets.chat_sidebar import ChatItem, ChatSidebar
 from titan.tui.widgets.compaction_progress import CompactionProgress
 from titan.tui.widgets.status_bar import StatusBar
 
@@ -63,7 +62,6 @@ class TitanApp(App):
         ("pagedown", "scroll_down"),
         ("ctrl+o", "toggle_thinking"),
         ("ctrl+y", "copy_mode"),
-        Binding("ctrl+e", "toggle_chat_sidebar", priority=True),
     ]
 
     def __init__(self, working_dir: str = "."):
@@ -83,7 +81,6 @@ class TitanApp(App):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
-            yield ChatSidebar(id="chat-sidebar")
             with Vertical(id="main-area"):
                 yield ChatLog(id="chat-log")
                 yield CompactionProgress()
@@ -155,15 +152,6 @@ class TitanApp(App):
         mode = "full" if self._show_full_thinking else "summary"
         log = self.query_one("#chat-log", ChatLog)
         log.write(f"[dim]Thinking mode: {mode} (Ctrl+O to toggle)[/dim]")
-
-    async def action_toggle_chat_sidebar(self) -> None:
-        chat_sidebar = self.query_one(ChatSidebar)
-        chat_sidebar.display = not chat_sidebar.display
-        if chat_sidebar.display:
-            await chat_sidebar.populate(self._store.list_chats(cwd=os.getcwd()))
-            chat_sidebar.query_one(ListView).focus()
-        else:
-            self.query_one("#input-box", Input).focus()
 
     def action_scroll_up(self) -> None:
         self.query_one("#chat-log", ChatLog).scroll_page_up()
@@ -257,15 +245,6 @@ class TitanApp(App):
         # Run agent in background thread so UI doesn't freeze
         self.query_one(StatusBar).start_thinking()
         self._run_agent(user_input, log)
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        item = event.item
-        if not isinstance(item, ChatItem):
-            return
-        self._store.load(item.chat_id)
-        set_current_chat_id(self._store.id)
-        self._render_chat()
-        self.query_one("#input-box", Input).focus()
 
     def _handle_command(self, user_input: str, log: ChatLog) -> None:
         name, _, args = user_input.strip().partition(" ")
@@ -490,6 +469,20 @@ class TitanApp(App):
             input_wgt.disabled = False
             input_wgt.focus()
         self.query_one("#chat-log", ChatLog).write("[dim]Chat compacted.[/dim]")
+
+    @work
+    async def _resume_chat(self) -> None:
+        metas = self._store.list_chats(cwd=os.getcwd())
+        if not metas:
+            self.query_one("#chat-log", ChatLog).write("[dim]No saved chats.[/dim]")
+            return
+        chat_id = await self.push_screen_wait(ChatPickerScreen(metas))
+        if chat_id is None:
+            return
+        self._store.load(chat_id)
+        set_current_chat_id(self._store.id)
+        self._render_chat()
+        self.query_one("#input-box", Input).focus()
 
 
 def run(working_dir: str = "."):
