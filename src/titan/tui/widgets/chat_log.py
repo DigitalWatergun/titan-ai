@@ -1,6 +1,7 @@
 from rich.console import RenderableType
 from rich.text import Text
 from textual.containers import VerticalScroll
+from textual.events import Key
 from textual.geometry import Offset, Region
 from textual.screen import Screen
 from textual.selection import SelectEnd, Selection, SelectStart, SelectState
@@ -34,7 +35,6 @@ class ChatLog(VerticalScroll, can_focus=True):
         ("k", "cursor_up", ""),
         ("h", "cursor_left", ""),
         ("l", "cursor_right", ""),
-        ("g", "cursor_top", ""),
         ("G", "cursor_bottom", ""),
         ("ctrl+d", "cursor_half_down", ""),
         ("ctrl+u", "cursor_half_up", ""),
@@ -60,6 +60,7 @@ class ChatLog(VerticalScroll, can_focus=True):
         self._anchor_pos: tuple[int, int] | None = None
         self._anchor_forward: tuple[Widget, Offset, int, int] | None = None
         self._anchor_backward: tuple[Widget, Offset, int, int] | None = None
+        self._pending_g = False
 
     def _screen_offset(self, row: int, col: int) -> Offset:
         scroll_x, scroll_y = self.scroll_offset
@@ -309,12 +310,25 @@ class ChatLog(VerticalScroll, can_focus=True):
             self._desired_col = self._cursor_col
         self._paint_cursor()
 
-    def action_cursor_top(self) -> None:
+    def _move_to_first_text_line(self) -> None:
         if self.scroll_offset.y != 0:
             self.scroll_to(y=0, animate=False, immediate=True)
             self.screen._refresh_layout()
         first_text_row = self._find_text_row(0, 1)
         self._move_cursor_row(0 if first_text_row is None else first_text_row)
+
+    def on_key(self, event: Key) -> None:
+        if not self._copy_mode:
+            self._pending_g = False
+            return
+        if event.key == "g":
+            if self._pending_g:
+                self._pending_g = False
+                self._move_to_first_text_line()
+            else:
+                self._pending_g = True
+        else:
+            self._pending_g = False
 
     def action_cursor_bottom(self) -> None:
         self._move_to_last_text_line()

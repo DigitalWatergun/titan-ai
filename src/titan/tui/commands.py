@@ -65,13 +65,13 @@ def show_help(ctx: CommandContext) -> None:
     ctx.log.write(
         "  [dim]/copy         - enter copy mode (vim keys) to select/copy[/dim]"
     )
+    ctx.log.write("  [dim]/resume       — resume a saved conversation[/dim]")
     ctx.log.write("  [dim]/help         — show this help[/dim]")
     ctx.log.write("  [dim]/quit         — exit[/dim]")
     ctx.log.write("")
     ctx.log.write("[bold]Keyboard shortcuts:[/bold]")
     ctx.log.write("  [dim]Esc           — interrupt current response[/dim]")
     ctx.log.write("  [dim]Ctrl+O        — toggle full/summary thinking mode[/dim]")
-    ctx.log.write("  [dim]Ctrl+E        — toggle recent chats[/dim]")
     ctx.log.write(
         "  [dim]Ctrl+Y        - copy mode: hjkl move, v select, y yank, i/q exit[/dim]"
     )
@@ -159,3 +159,8 @@ def compact_now(ctx: CommandContext) -> None:
 @command("/copy")
 def copy_mode(ctx: CommandContext) -> None:
     ctx.app.action_copy_mode()
+
+
+@command("/resume")
+def resume_chat(ctx: CommandContext) -> None:
+    ctx.app._resume_chat()
